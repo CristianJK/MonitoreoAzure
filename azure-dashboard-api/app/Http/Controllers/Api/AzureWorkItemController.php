@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AzureDevOpsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AzureWorkItemController extends Controller
@@ -36,5 +37,29 @@ class AzureWorkItemController extends Controller
             ];
         }, $workItems);
         return response()->json($formattedItems);
+    }
+
+    public function linkBranch(Request $request, $id): JsonResponse
+    {
+        // Validamos que el frontend envíe los datos necesarios
+        $request->validate([
+            'repository_id' => 'required|string',
+            'branch_name' => 'required|string',
+        ]);
+
+        $result = $this->azureDevOpsService->linkBranchToWorkItem(
+            $id, 
+            $request->input('repository_id'), 
+            $request->input('branch_name')
+        );
+
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], 500);
+        }
+
+        return response()->json([
+            'message' => 'Rama enlazada correctamente al Work Item',
+            'data' => $result
+        ]);
     }
 }
