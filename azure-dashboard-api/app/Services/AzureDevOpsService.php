@@ -46,36 +46,39 @@ protected $client;
         ]);
     }
 
-    public function getActiveWorkItems($limit = 100, $assignedTo = '@Me')
+    public function getActiveWorkItems($page = 1, $limit = 10, $assignedTo = '@Me')
     {
         try {
             
-           $query = "Select [System.Id], [System.Title], [System.State] 
-                      From WorkItems 
-                      Where [System.State] <> 'Closed'";
+            $page = max(1, (int) $page);
+            $limit = max(1, (int) $limit);
+            $query = $this->buildActiveWorkItemsQuery($assignedTo);
 
-            if ($assignedTo) {
-                if (strtolower($assignedTo) === '@me') {                    
-                    $query .= " And [System.AssignedTo] = @Me";
-                } else {                    
-                    $query .= " And [System.AssignedTo] = '{$assignedTo}'";
-                }
-            }
+            $totalResponse = $this->client->post("wit/wiql?api-version=7.1", [
+                'json' => ['query' => $query]
+            ]);
+            $totalResult = json_decode($totalResponse->getBody()->getContents(), true);
+            $total = count($totalResult['workItems'] ?? []);
 
-            $query .= " Order By [System.ChangedDate] Desc";
-
-            $response = $this->client->post("wit/wiql?\$top={$limit}&api-version=7.1", [
+            $skip = ($page - 1) * $limit;
+            $response = $this->client->post("wit/wiql?\$top={$limit}&\$skip={$skip}&api-version=7.1", [
                 'json' => ['query' => $query]
             ]);
 
             $wiqlResult = json_decode($response->getBody()->getContents(), true);
 
             if (empty($wiqlResult['workItems'])) {
-                return [];
+                return [
+                    'items' => [],
+                    'total' => $total,
+                ];
             }
 
             $ids = array_column($wiqlResult['workItems'], 'id');
-            return $this->getWorkItemsDetails($ids);
+            return [
+                'items' => $this->getWorkItemsDetails($ids),
+                'total' => $total,
+            ];
 
         } catch (\Exception $e) {
             $urlAttempted = method_exists($e, 'getRequest') ? (string) $e->getRequest()->getUri() : 'URL desconocida';
@@ -87,6 +90,23 @@ protected $client;
             
             return ['error' => "URL intentada: {$urlAttempted} | Error: {$errorDetail}"];
         }
+    }
+
+    private function buildActiveWorkItemsQuery($assignedTo)
+    {
+        $query = "Select [System.Id], [System.Title], [System.State] 
+                  From WorkItems 
+                  Where [System.State] <> 'Closed'";
+
+        if ($assignedTo) {
+            if (strtolower($assignedTo) === '@me') {
+                $query .= " And [System.AssignedTo] = @Me";
+            } else {
+                $query .= " And [System.AssignedTo] = '{$assignedTo}'";
+            }
+        }
+
+        return $query . " Order By [System.ChangedDate] Desc";
     }
 
     private function getWorkItemsDetails(array $ids)

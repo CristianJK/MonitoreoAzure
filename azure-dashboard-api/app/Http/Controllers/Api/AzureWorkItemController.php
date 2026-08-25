@@ -18,10 +18,11 @@ class AzureWorkItemController extends Controller
 
     public function index(Request $request)
     {
-        $limit = $request->get('limit', 100);
-        $assignedTo = $request->get('assigned_to', '@Me');
+        $limit = $request->limit ?? 10;
+        $assignedTo = $request->assigned_to ?? '@Me';
+        $page = $request->page ?? 1;
 
-        $workItems = $this->azureDevOpsService->getActiveWorkItems($limit, $assignedTo);
+        $workItems = $this->azureDevOpsService->getActiveWorkItems($page, $limit, $assignedTo);
 
         if (isset($workItems['error'])) {
             return response()->json(['message' => $workItems['error']], 500);
@@ -35,8 +36,17 @@ class AzureWorkItemController extends Controller
                 'type' => $item['fields']['System.WorkItemType'] ?? '',
                 'assigned_to' => $item['fields']['System.AssignedTo']['displayName'] ?? 'Sin asignar',
             ];
-        }, $workItems);
-        return response()->json($formattedItems);
+        }, $workItems['items']);
+
+        $total = $workItems['total'];
+
+        return response()->json([
+            'data' => $formattedItems,
+            'total' => $total,
+            'totalPages' => (int) ceil($total / $limit),
+            'page' => (int) $page,
+            'limit' => (int) $limit,
+        ]);
     }
 
     public function linkBranch(Request $request, $id): JsonResponse
