@@ -13,12 +13,20 @@ protected $client;
 
     public function __construct()
     {
-        $this->organizationUrl = rtrim(env('AZURE_DEVOPS_ORG'), '/');
+        $orgValue = env('AZURE_DEVOPS_ORG');
+        
+        if (!str_starts_with($orgValue, 'http')) {
+            $this->organizationUrl = "https://dev.azure.com/" . trim($orgValue, '/');
+        } else {
+            $this->organizationUrl = rtrim($orgValue, '/');
+        }
+
         $this->project = rawurlencode(env('AZURE_DEVOPS_PROJECT'));
         $pat = env('AZURE_DEVOPS_PAT');
 
-        // Cliente para nivel de PROYECTO (Work Items)
+        // Cliente para nivel de PROYECTO
         $this->client = new Client([
+            // Aseguramos que termine en slash para que Guzzle concatene bien
             'base_uri' => "{$this->organizationUrl}/{$this->project}/_apis/",
             'auth'     => ['', $pat],
             'headers'  => [
@@ -27,9 +35,9 @@ protected $client;
             ],
         ]);
 
-        // Cliente para nivel de ORGANIZACIÓN (Agentes, Pools)
+        // Cliente para nivel de ORGANIZACIÓN (Agentes)
         $this->orgClient = new Client([
-            'base_uri' => "{$this->organizationUrl}/_apis/", // <-- Ruta limpia sin el proyecto
+            'base_uri' => "{$this->organizationUrl}/_apis/",
             'auth'     => ['', $pat],
             'headers'  => [
                 'Accept'       => 'application/json',
@@ -131,6 +139,7 @@ protected $client;
     public function getRepositories()
     {
         try {
+            
             $response = $this->client->get("git/repositories?api-version=7.1");
             $repos = json_decode($response->getBody()->getContents(), true)['value'] ?? [];
             
