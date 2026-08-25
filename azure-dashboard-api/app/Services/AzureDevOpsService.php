@@ -185,6 +185,7 @@ protected $client;
             return ['error' => "Fallo al enlazar la rama: {$errorDetail}"];
         }
     }
+    
 
     public function getRepositories()
     {
@@ -277,6 +278,75 @@ protected $client;
             }
             
             return ['error' => "URL intentada: {$urlAttempted} | Error: {$errorDetail}"];
+        }
+    }
+
+
+    /**
+     * Obtiene los Pull Requests activos (bypassing completed/abandoned) de un repositorio
+     */
+    public function getActivePullRequests($repositoryId)
+    {
+        try {
+            // Filtramos por estado 'active' para que solo salgan los PRs en curso
+            $response = $this->client->get("git/repositories/{$repositoryId}/pullrequests?searchCriteria.status=active&api-version=7.1");
+            $prs = json_decode($response->getBody()->getContents(), true)['value'] ?? [];
+            
+            return array_map(function ($pr) {
+                return [
+                    'pullRequestId' => $pr['pullRequestId'],
+                    'title' => $pr['title'],
+                    'sourceRefName' => str_replace('refs/heads/', '', $pr['sourceRefName'] ?? ''),
+                    'targetRefName' => str_replace('refs/heads/', '', $pr['targetRefName'] ?? ''),
+                    'createdBy' => $pr['createdBy']['displayName'] ?? 'Desconocido'
+                ];
+            }, $prs);
+
+        } catch (\Exception $e) {
+            $errorDetail = $e->getMessage();
+            if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
+                $errorDetail = $e->getResponse()->getBody()->getContents();
+            }
+            return ['error' => "Error al obtener Pull Requests: {$errorDetail}"];
+        }
+    }
+
+    /**
+     * Enlaza un Pull Request existente al Work Item
+     */
+    public function linkPullRequestToWorkItem($workItemId, $repositoryId, $pullRequestId)
+    {
+        try {
+            // Estructura oficial de Azure para enlazar un Pull Request mediante vstfs
+            $artifactUrl = "vstfs:///Git/PullRequest/{$this->project}/{$repositoryId}/{$pullRequestId}";
+
+            $payload = [
+                [
+                    "op" => "add",
+                    "path" => "/relations/-",
+                    "value" => [
+                        "rel" => "ArtifactLink",
+                        "url" => $artifactUrl,
+                        "attributes" => [
+                            "name" => "Pull Request"
+                        ]
+                    ]
+                ]
+            ];
+
+            $response = $this->client->patch("wit/workitems/{$workItemId}?api-version=7.1", [
+                'headers' => ['Content-Type' => 'application/json-patch+json'],
+                'json' => $payload
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+
+        } catch (\Exception $e) {
+            $errorDetail = $e->getMessage();
+            if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
+                $errorDetail = $e->getResponse()->getBody()->getContents();
+            }
+            return ['error' => "Fallo al enlazar el Pull Request: {$errorDetail}"];
         }
     }
 

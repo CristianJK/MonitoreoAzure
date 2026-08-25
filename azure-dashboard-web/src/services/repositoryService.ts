@@ -28,5 +28,13 @@ export const repositoryService = {
             branch_name: branchName
         });
         return response.data;
-    }
+    },
+
+    async linkPullRequest(workItemId: number, repositoryId: string, pullRequestId: number): Promise<any> {
+    const response = await apiClient.post(`/work-items/${workItemId}/link-pr`, {
+        repository_id: repositoryId,
+        pull_request_id: pullRequestId
+    });
+    return response.data;
+}
 };

@@ -73,4 +73,27 @@ class AzureWorkItemController extends Controller
             'data' => $result
         ]);
     }
+
+    public function linkPullRequest(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'repository_id' => 'required|string',
+            'pull_request_id' => 'required|integer',
+        ]);
+
+        $result = $this->azureDevOpsService->linkPullRequestToWorkItem(
+            $id, 
+            $request->input('repository_id'), 
+            $request->input('pull_request_id')
+        );
+
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], 500);
+        }
+
+        return response()->json([
+            'message' => 'Pull Request enlazado correctamente al Work Item',
+            'data' => $result
+        ]);
+    }
 }

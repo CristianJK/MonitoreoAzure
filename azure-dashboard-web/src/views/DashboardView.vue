@@ -3,11 +3,29 @@ import { ref, onMounted, watch } from 'vue';
 import { workItemService, type WorkItem } from "@/services/workItemService";
 import AppPagination from '@/components/AppPagination.vue';
 import CardsWorkItme from '@/components/CardsWorkItme.vue';
+import LinkBranchModal from '@/components/LinkBranchModal.vue';
 
 // Estado reactivo
 const workItems = ref<WorkItem[]>([]);
 const isLoading = ref<boolean>(true);
 const errorMessage = ref<string | null>(null);
+
+// Estados para el Modal de Vinculación de Ramas
+const isModalOpen = ref<boolean>(false);
+const activeWorkItemId = ref<number | null>(null);
+
+
+// Abrir el modal para una tarea específica
+const openLinkModal = (id: number) => {
+    activeWorkItemId.value = id;
+    isModalOpen.value = true;
+};
+
+// Cerrar y limpiar
+const closeModal = () => {
+    isModalOpen.value = false;
+    activeWorkItemId.value = null;
+};
 
 //paginacion
 
@@ -175,7 +193,9 @@ onMounted(() => {
                         </div>
                         
                         <div class="col-span-1 flex justify-end">
-                            <button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-bright transition-colors" title="Vincular Rama">
+                            <button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-bright transition-colors" title="Vincular Rama"
+                                @click="openLinkModal(item.id)"
+                            >
                                 <span class="material-symbols-outlined text-lg">account_tree</span>
                             </button>
                         </div>
@@ -191,5 +211,13 @@ onMounted(() => {
                 />
             </div>
         </div>
+        <!-- Componente Modal integrado -->
+        <LinkBranchModal 
+            v-if="activeWorkItemId !== null"
+            :isOpen="isModalOpen" 
+            :workItemId="activeWorkItemId" 
+            @close="closeModal"
+            @linked="loadWorkItems"
+        />
     </main>
 </template>

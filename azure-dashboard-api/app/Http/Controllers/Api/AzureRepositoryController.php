@@ -36,4 +36,16 @@ class AzureRepositoryController extends Controller
 
         return response()->json($branches);
     }
+
+
+    public function pullRequests($repositoryId): JsonResponse
+    {
+        $prs = $this->azureDevOpsService->getActivePullRequests($repositoryId);
+
+        if (isset($prs['error'])) {
+            return response()->json(['message' => $prs['error']], 500);
+        }
+
+        return response()->json($prs);
+    }
 }
