@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import { workItemService } from "@/services/workItemService";
+import { workItemService, type WorkItem } from "@/services/workItemService";
 import AppPagination from '@/components/AppPagination.vue';
+import CardsWorkItme from '@/components/CardsWorkItme.vue';
 
 // Estado reactivo
 const workItems = ref<WorkItem[]>([]);
@@ -14,6 +15,11 @@ const currentPage = ref<number>(1);
 const totalPages = ref<number>(1);
 const totalItems = ref<number>(0);
 const itemsPerPage = ref<number>(10);
+const summary = ref({
+    done: 0,
+    inProgress: 0,
+    toDo: 0,
+});
 
 // Cargar datos usando el servicio
 const loadWorkItems = async () => {
@@ -29,6 +35,7 @@ const loadWorkItems = async () => {
         workItems.value = response.data;
         totalPages.value = response.totalPages;
         totalItems.value = response.total;
+        summary.value = response.summary;
     } catch (error) {
         console.error('Error al obtener los Work Items:', error);
         errorMessage.value = 'No se pudieron cargar las tareas. Verifica la conexión con Laravel.';
@@ -80,6 +87,30 @@ onMounted(() => {
                                             New Item
                                         </button>
                 </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <CardsWorkItme
+                    title="Done"
+                    :value="summary.done"
+                    description="Asignados a ti"
+                    icon="check_circle"
+                    accent-class="bg-success"
+                />
+                <CardsWorkItme
+                    title="In Progress"
+                    :value="summary.inProgress"
+                    description="Asignados a ti"
+                    icon="sync"
+                    accent-class="bg-primary-container"
+                />
+                <CardsWorkItme
+                    title="To Do"
+                    :value="summary.toDo"
+                    description="Asignados a ti"
+                    icon="assignment"
+                    accent-class="bg-secondary"
+                />
             </div>
 
             <!-- Tabla de Work Items -->

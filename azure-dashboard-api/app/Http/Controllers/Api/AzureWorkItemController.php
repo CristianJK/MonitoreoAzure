@@ -46,6 +46,7 @@ class AzureWorkItemController extends Controller
             'totalPages' => (int) ceil($total / $limit),
             'page' => (int) $page,
             'limit' => (int) $limit,
+            'summary' => $workItems['summary'],
         ]);
     }
 

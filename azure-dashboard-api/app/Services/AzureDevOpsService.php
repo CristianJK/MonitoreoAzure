@@ -60,6 +60,12 @@ protected $client;
             $totalResult = json_decode($totalResponse->getBody()->getContents(), true);
             $total = count($totalResult['workItems'] ?? []);
 
+            $summary = [
+                'done' => $this->countWorkItemsByState('Done', $assignedTo),
+                'inProgress' => $this->countWorkItemsByState('In Progress', $assignedTo),
+                'toDo' => $this->countWorkItemsByState('To Do', $assignedTo),
+            ];
+
             $skip = ($page - 1) * $limit;
             $response = $this->client->post("wit/wiql?\$top={$limit}&\$skip={$skip}&api-version=7.1", [
                 'json' => ['query' => $query]
@@ -71,6 +77,7 @@ protected $client;
                 return [
                     'items' => [],
                     'total' => $total,
+                    'summary' => $summary,
                 ];
             }
 
@@ -78,6 +85,7 @@ protected $client;
             return [
                 'items' => $this->getWorkItemsDetails($ids),
                 'total' => $total,
+                'summary' => $summary,
             ];
 
         } catch (\Exception $e) {
@@ -107,6 +115,28 @@ protected $client;
         }
 
         return $query . " Order By [System.ChangedDate] Desc";
+    }
+
+    private function countWorkItemsByState($state, $assignedTo)
+    {
+        $query = "Select [System.Id]
+                  From WorkItems
+                  Where [System.State] = '{$state}'";
+
+        if ($assignedTo) {
+            if (strtolower($assignedTo) === '@me') {
+                $query .= " And [System.AssignedTo] = @Me";
+            } else {
+                $query .= " And [System.AssignedTo] = '{$assignedTo}'";
+            }
+        }
+
+        $response = $this->client->post("wit/wiql?api-version=7.1", [
+            'json' => ['query' => $query]
+        ]);
+        $result = json_decode($response->getBody()->getContents(), true);
+
+        return count($result['workItems'] ?? []);
     }
 
     private function getWorkItemsDetails(array $ids)
