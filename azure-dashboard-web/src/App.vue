@@ -20,8 +20,8 @@ import DashboardView from './views/DashboardView.vue';
         <ul class="flex flex-col gap-1 px-2">
           <li>
             <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md bg-secondary-container text-on-secondary-container border-l-4 border-primary font-medium text-sm">
-              <span class="material-symbols-outlined">dashboard</span>
-              <span>Overview</span>
+              <span class="material-symbols-outlined color-white">dashboard</span>
+              <span class="text-white">Overview</span>
             </a>
           </li>
         </ul>

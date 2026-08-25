@@ -1,17 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { workItemService } from "@/services/workItemService";
+import AppPagination from '@/components/AppPagination.vue';
 
 // Estado reactivo
 const workItems = ref<WorkItem[]>([]);
 const isLoading = ref<boolean>(true);
 const errorMessage = ref<string | null>(null);
 
+//paginacion
+
+const currentPage = ref<number>(1);
+const totalPages = ref<number>(1);
+const totalItems = ref<number>(0);
+const itemsPerPage = ref<number>(10);
+
 // Cargar datos usando el servicio
 const loadWorkItems = async () => {
     try {
         isLoading.value = true;
-        workItems.value = await workItemService.getActiveWorkItems();
+        errorMessage.value = null;
+
+        const response = await workItemService.getActiveWorkItems(
+            currentPage.value,
+            itemsPerPage.value
+        );
+        console.log(response);
+        workItems.value = response.data;
+        totalPages.value = response.totalPages;
+        totalItems.value = response.total;
     } catch (error) {
         console.error('Error al obtener los Work Items:', error);
         errorMessage.value = 'No se pudieron cargar las tareas. Verifica la conexión con Laravel.';
@@ -19,6 +36,11 @@ const loadWorkItems = async () => {
         isLoading.value = false;
     }
 };
+
+watch(currentPage, () => {
+    loadWorkItems();
+});
+
 
 // Helpers visuales
 const getIconByType = (type: string) => {
@@ -48,12 +70,26 @@ onMounted(() => {
                     <h1 class="text-3xl font-semibold text-on-surface">Dashboard Módulo de Gestión</h1>
                     <p class="text-sm text-on-surface-variant mt-1">Métricas en tiempo real y tareas activas de Azure DevOps.</p>
                 </div>
+                <div class="flex gap-3">
+                    <button class="bg-surface-variant border border-outline-variant text-on-surface px-4 py-2 rounded-md font-body-sm text-body-sm hover:bg-surface-bright transition-colors flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                                            Filter
+                                        </button>
+                    <button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-md font-body-sm text-body-sm hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">add</span>
+                                            New Item
+                                        </button>
+                </div>
             </div>
 
             <!-- Tabla de Work Items -->
             <div class="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
                 <div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-high">
-                    <h2 class="text-lg font-medium text-on-surface">Mis Tareas Activas</h2>
+                    <h2 class="text-lg font-medium text-on-surface">Work Items</h2>
+                    <button class="bg-surface-variant border border-primary text-primary px-3 py-1.5 rounded-md font-body-sm text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2 group">
+                        <span class="material-symbols-outlined text-[16px] group-hover:animate-spin-slow">auto_awesome</span>
+                        Daily Comment Automation
+                    </button>
                 </div>
 
                 <!-- Headers -->
@@ -114,6 +150,14 @@ onMounted(() => {
                         </div>
                     </div>
                 </div>
+                <!-- Paginación -->
+                <AppPagination 
+                    v-model:page="currentPage" 
+                    :total-pages="totalPages" 
+                    :total-items="totalItems"
+                    :items-per-page="itemsPerPage"
+                    :is-loading="isLoading"
+                />
             </div>
         </div>
     </main>
