@@ -1,0 +1,120 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { workItemService } from "@/services/workItemService";
+
+// Estado reactivo
+const workItems = ref<WorkItem[]>([]);
+const isLoading = ref<boolean>(true);
+const errorMessage = ref<string | null>(null);
+
+// Cargar datos usando el servicio
+const loadWorkItems = async () => {
+    try {
+        isLoading.value = true;
+        workItems.value = await workItemService.getActiveWorkItems();
+    } catch (error) {
+        console.error('Error al obtener los Work Items:', error);
+        errorMessage.value = 'No se pudieron cargar las tareas. Verifica la conexión con Laravel.';
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+// Helpers visuales
+const getIconByType = (type: string) => {
+    if (type.toLowerCase().includes('bug')) return 'bug_report';
+    if (type.toLowerCase().includes('product')) return 'inventory_2';
+    return 'task';
+};
+
+const getColorByType = (type: string) => {
+    if (type.toLowerCase().includes('bug')) return 'text-error';
+    if (type.toLowerCase().includes('product')) return 'text-secondary';
+    return 'text-primary';
+};
+
+onMounted(() => {
+    loadWorkItems();
+});
+</script>
+
+<template>
+    <main class="flex-1 md:ml-64 pt-16 p-6 overflow-y-auto min-h-screen bg-background">
+        <div class="max-w-7xl mx-auto space-y-8">
+            
+            <!-- Header Section -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-3xl font-semibold text-on-surface">Dashboard Módulo de Gestión</h1>
+                    <p class="text-sm text-on-surface-variant mt-1">Métricas en tiempo real y tareas activas de Azure DevOps.</p>
+                </div>
+            </div>
+
+            <!-- Tabla de Work Items -->
+            <div class="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-high">
+                    <h2 class="text-lg font-medium text-on-surface">Mis Tareas Activas</h2>
+                </div>
+
+                <!-- Headers -->
+                <div class="grid grid-cols-12 gap-4 px-4 py-2 border-b border-outline-variant bg-surface-container-low text-xs font-bold text-on-surface-variant uppercase">
+                    <div class="col-span-1">ID</div>
+                    <div class="col-span-5">Title</div>
+                    <div class="col-span-2">State</div>
+                    <div class="col-span-3">Assigned To</div>
+                    <div class="col-span-1 text-right">Actions</div>
+                </div>
+
+                <!-- Estados -->
+                <div v-if="isLoading" class="p-8 text-center text-on-surface-variant">
+                    <span class="material-symbols-outlined animate-spin text-4xl mb-2">sync</span>
+                    <p>Cargando datos desde Azure...</p>
+                </div>
+
+                <div v-else-if="errorMessage" class="p-8 text-center text-error bg-error/10">
+                    <p>{{ errorMessage }}</p>
+                </div>
+
+                <!-- Contenido -->
+                <div v-else class="divide-y divide-outline-variant">
+                    <div 
+                        v-for="item in workItems" 
+                        :key="item.id"
+                        class="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-surface-variant transition-colors group"
+                    >
+                        <div class="col-span-1 font-mono text-sm text-primary">{{ item.id }}</div>
+                        
+                        <div class="col-span-5 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-base" :class="getColorByType(item.type)">
+                                {{ getIconByType(item.type) }}
+                            </span>
+                            <span class="text-sm text-on-surface truncate" :title="item.title">
+                                {{ item.title }}
+                            </span>
+                        </div>
+                        
+                        <div class="col-span-2">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary border border-primary/30 text-xs">
+                                <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                {{ item.state }}
+                            </span>
+                        </div>
+                        
+                        <div class="col-span-3 flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-surface-bright flex items-center justify-center text-xs font-bold text-on-surface border border-outline-variant">
+                                {{ item.assigned_to.charAt(0) }}
+                            </div>
+                            <span class="text-sm text-on-surface-variant truncate">{{ item.assigned_to }}</span>
+                        </div>
+                        
+                        <div class="col-span-1 flex justify-end">
+                            <button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-bright transition-colors" title="Vincular Rama">
+                                <span class="material-symbols-outlined text-lg">account_tree</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</template>
