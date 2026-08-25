@@ -12,7 +12,7 @@ class AzureDevOpsService
 
     public function __construct()
     {
-        $this->organization = env('AZURE_DEVOPS_ORGANIZATION');
+        $this->organization = env('AZURE_DEVOPS_ORG');
         $this->project = env('AZURE_DEVOPS_PROJECT');
         
         $this->client = new Client([
@@ -25,15 +25,25 @@ class AzureDevOpsService
         ]);
     }
 
-    public function getActiveWorkItems()
+    public function getActiveWorkItems($limit = 100, $assignedTo = '@Me')
     {
         try {
-            $query = "Select [System.Id], [System.Title], [System.State] 
+            
+           $query = "Select [System.Id], [System.Title], [System.State] 
                       From WorkItems 
-                      Where [System.State] <> 'Closed' 
-                      Order By [System.ChangedDate] Desc";
+                      Where [System.State] <> 'Closed'";
 
-            $response = $this->client->post('wit/wiql?api-version=7.1', [
+            if ($assignedTo) {
+                if (strtolower($assignedTo) === '@me') {                    
+                    $query .= " And [System.AssignedTo] = @Me";
+                } else {                    
+                    $query .= " And [System.AssignedTo] = '{$assignedTo}'";
+                }
+            }
+
+            $query .= " Order By [System.ChangedDate] Desc";
+
+            $response = $this->client->post("wit/wiql?\$top={$limit}&api-version=7.1", [
                 'json' => ['query' => $query]
             ]);
 
@@ -46,9 +56,15 @@ class AzureDevOpsService
             $ids = array_column($wiqlResult['workItems'], 'id');
             return $this->getWorkItemsDetails($ids);
 
-        } catch (RequestException $e) {
-            Log::error('Error fetching work items: ' . $e->getMessage());
-            return ['error' => 'No se pudieron obtener los Work Items'];
+        } catch (\Exception $e) {
+            $urlAttempted = method_exists($e, 'getRequest') ? (string) $e->getRequest()->getUri() : 'URL desconocida';
+            $errorDetail = $e->getMessage();
+            
+            if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
+                $errorDetail = $e->getResponse()->getBody()->getContents();
+            }
+            
+            return ['error' => "URL intentada: {$urlAttempted} | Error: {$errorDetail}"];
         }
     }
 

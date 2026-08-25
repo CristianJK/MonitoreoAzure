@@ -15,9 +15,12 @@ class AzureWorkItemController extends Controller
         $this->azureDevOpsService = $azureDevOpsService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $workItems = $this->azureDevOpsService->getActiveWorkItems();
+        $limit = $request->get('limit', 100);
+        $assignedTo = $request->get('assigned_to', '@Me');
+
+        $workItems = $this->azureDevOpsService->getActiveWorkItems($limit, $assignedTo);
 
         if (isset($workItems['error'])) {
             return response()->json(['message' => $workItems['error']], 500);
