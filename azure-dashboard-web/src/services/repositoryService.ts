@@ -11,6 +11,16 @@ export interface Branch {
     objectId: string;
 }
 
+export interface PullRequest {
+    pullRequestId: number;
+    title: string;
+    sourceRefName: string;
+    targetRefName: string;
+    createdBy: string;
+    repository_id: string;
+    artifactId: string;
+}
+
 export const repositoryService = {
     async getRepositories(): Promise<Repository[]> {
         const response = await apiClient.get<Repository[]>('/repositories');
@@ -30,10 +40,14 @@ export const repositoryService = {
         return response.data;
     },
 
-    async linkPullRequest(workItemId: number, repositoryId: string, pullRequestId: number): Promise<any> {
+    async getPullRequests(repositoryId: string): Promise<PullRequest[]> {
+        const response = await apiClient.get<PullRequest[]>(`/repositories/${repositoryId}/pull-requests`);
+        return response.data;
+    },
+
+    async linkPullRequest(workItemId: number, artifactId: string): Promise<any> {
     const response = await apiClient.post(`/work-items/${workItemId}/link-pr`, {
-        repository_id: repositoryId,
-        pull_request_id: pullRequestId
+        artifact_id: artifactId
     });
     return response.data;
 }

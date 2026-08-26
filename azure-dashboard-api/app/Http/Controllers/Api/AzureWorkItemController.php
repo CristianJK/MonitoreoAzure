@@ -77,14 +77,12 @@ class AzureWorkItemController extends Controller
     public function linkPullRequest(Request $request, $id): JsonResponse
     {
         $request->validate([
-            'repository_id' => 'required|string',
-            'pull_request_id' => 'required|integer',
+            'artifact_id' => 'required|string',
         ]);
 
         $result = $this->azureDevOpsService->linkPullRequestToWorkItem(
             $id, 
-            $request->input('repository_id'), 
-            $request->input('pull_request_id')
+            $request->input('artifact_id')
         );
 
         if (isset($result['error'])) {

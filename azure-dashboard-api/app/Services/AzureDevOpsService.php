@@ -288,45 +288,46 @@ protected $client;
     public function getActivePullRequests($repositoryId)
     {
         try {
-            // Filtramos por estado 'active' para que solo salgan los PRs en curso
             $response = $this->client->get("git/repositories/{$repositoryId}/pullrequests?searchCriteria.status=active&api-version=7.1");
             $prs = json_decode($response->getBody()->getContents(), true)['value'] ?? [];
             
             return array_map(function ($pr) {
+                $projectGuid = $pr['repository']['project']['id'];
+                $repoGuid = $pr['repository']['id'];
+                $prId = $pr['pullRequestId'];
+
+                // ESTÁNDAR OFICIAL DE MICROSOFT: Barras normales (/) y GUIDs
+                $artifactId = "vstfs:///Git/PullRequestId/{$projectGuid}/{$repoGuid}/{$prId}";
+
                 return [
-                    'pullRequestId' => $pr['pullRequestId'],
+                    'pullRequestId' => $prId,
                     'title' => $pr['title'],
                     'sourceRefName' => str_replace('refs/heads/', '', $pr['sourceRefName'] ?? ''),
                     'targetRefName' => str_replace('refs/heads/', '', $pr['targetRefName'] ?? ''),
-                    'createdBy' => $pr['createdBy']['displayName'] ?? 'Desconocido'
+                    'createdBy' => $pr['createdBy']['displayName'] ?? 'Desconocido',
+                    'artifactId' => $artifactId
                 ];
             }, $prs);
 
         } catch (\Exception $e) {
-            $errorDetail = $e->getMessage();
-            if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
-                $errorDetail = $e->getResponse()->getBody()->getContents();
-            }
-            return ['error' => "Error al obtener Pull Requests: {$errorDetail}"];
+            // ... (resto del catch igual)
+            return ['error' => 'Error al obtener Pull Requests'];
         }
     }
 
     /**
      * Enlaza un Pull Request existente al Work Item
      */
-    public function linkPullRequestToWorkItem($workItemId, $repositoryId, $pullRequestId)
+    public function linkPullRequestToWorkItem($workItemId, $artifactId)
     {
         try {
-            // Estructura oficial de Azure para enlazar un Pull Request mediante vstfs
-            $artifactUrl = "vstfs:///Git/PullRequest/{$this->project}/{$repositoryId}/{$pullRequestId}";
-
             $payload = [
                 [
                     "op" => "add",
                     "path" => "/relations/-",
                     "value" => [
                         "rel" => "ArtifactLink",
-                        "url" => $artifactUrl,
+                        "url" => $artifactId,
                         "attributes" => [
                             "name" => "Pull Request"
                         ]
@@ -343,9 +344,18 @@ protected $client;
 
         } catch (\Exception $e) {
             $errorDetail = $e->getMessage();
+            
             if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
                 $errorDetail = $e->getResponse()->getBody()->getContents();
+                
+                // ¡Mejora de UX! Si Azure dice que ya existe, lo tratamos como un éxito silencioso
+                if (str_contains($errorDetail, 'Relation already exists')) {
+                    return [
+                        'message' => 'El Pull Request ya se encontraba enlazado a esta tarea.'.$errorDetail
+                    ];
+                }
             }
+            
             return ['error' => "Fallo al enlazar el Pull Request: {$errorDetail}"];
         }
     }

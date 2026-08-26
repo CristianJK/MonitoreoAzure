@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { repositoryService, type Repository, type Branch } from '../services/repositoryService';
+import { repositoryService, type Repository, type Branch, type PullRequest } from '../services/repositoryService';
 
 const props = defineProps<{
     workItemId: number;
@@ -11,10 +11,12 @@ const emit = defineEmits(['close', 'linked']);
 
 const repositories = ref<Repository[]>([]);
 const branches = ref<Branch[]>([]);
+const pullRequests = ref<PullRequest[]>([]);
+const selectedArtifactId = ref<string>('');
 const selectedRepo = ref<string>('');
-const selectedBranch = ref<string>('');
+const selectedPullRequest = ref<string>('');
 const isLoadingRepos = ref<boolean>(false);
-const isLoadingBranches = ref<boolean>(false);
+const isLoadingPullRequests = ref<boolean>(false);
 const isSubmitting = ref<boolean>(false);
 const errorMessage = ref<string | null>(null);
 
@@ -37,30 +39,31 @@ const onRepoChange = async () => {
         return;
     }
     try {
-        isLoadingBranches.value = true;
-        selectedBranch.value = '';
-        branches.value = await repositoryService.getBranches(selectedRepo.value);
+        isLoadingPullRequests.value = true;
+        selectedArtifactId.value = '';
+        selectedPullRequest.value = '';
+        pullRequests.value = await repositoryService.getPullRequests(selectedRepo.value);
     } catch (e) {
-        errorMessage.value = 'Error al cargar las ramas del repositorio.';
+        errorMessage.value = 'Error al cargar las solicitudes de extracción del repositorio.';
     } finally {
-        isLoadingBranches.value = false;
+        isLoadingPullRequests.value = false;
     }
 };
 
-// Enlazar la rama seleccionada al Work Item
+// Enlazar la solicitud de extracción seleccionada al Work Item
 const submitLink = async () => {
-    if (!selectedRepo.value || !selectedBranch.value) return;
+    if (!selectedRepo.value || !selectedArtifactId.value) return;
 
     try {
         isSubmitting.value = true;
         errorMessage.value = null;
         
-        await repositoryService.linkBranch(props.workItemId, selectedRepo.value, selectedBranch.value);
+        await repositoryService.linkPullRequest(props.workItemId, selectedArtifactId.value);
         
         emit('linked');
         emit('close');
     } catch (e: any) {
-        errorMessage.value = e.response?.data?.message || 'Error al enlazar la rama.';
+        errorMessage.value = e.response?.data?.message || 'Error al enlazar la solicitud de extracción.';
     } finally {
         isSubmitting.value = false;
     }
@@ -73,7 +76,7 @@ const submitLink = async () => {
             
             <!-- Header -->
             <div class="flex justify-between items-center border-b border-outline-variant pb-4">
-                <h3 class="text-lg font-semibold text-on-surface">Vincular Rama a Taker #{{ workItemId }}</h3>
+                <h3 class="text-lg font-semibold text-on-surface">Vincular Solicitud de Extracción a Taker #{{ workItemId }}</h3>
                 <button @click="$emit('close')" class="text-on-surface-variant hover:text-on-surface">
                     <span class="material-symbols-outlined">close</span>
                 </button>
@@ -102,20 +105,20 @@ const submitLink = async () => {
                     <span v-if="isLoadingRepos" class="text-xs text-primary mt-1 block">Cargando repositorios...</span>
                 </div>
 
-                <!-- Rama -->
+                <!-- Solicitud de Extracción -->
                 <div>
-                    <label class="block text-xs font-bold text-on-surface-variant uppercase mb-2">Rama de Trabajo</label>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase mb-2">Solicitud de Extracción</label>
                     <select 
-                        v-model="selectedBranch" 
-                        :disabled="!selectedRepo || isLoadingBranches"
+                        v-model="selectedArtifactId" 
+                        :disabled="!selectedRepo || isLoadingPullRequests"
                         class="w-full bg-background border border-outline-variant rounded-md py-2 px-3 text-sm text-on-surface focus:outline-none focus:border-primary disabled:opacity-50"
                     >
-                        <option value="" disabled>Selecciona una rama...</option>
-                        <option v-for="branch in branches" :key="branch.objectId" :value="branch.name">
-                            {{ branch.name }}
+                        <option value="" disabled>Selecciona una solicitud de extracción...</option>
+                        <option v-for="pr in pullRequests" :key="pr.artifactId" :value="pr.artifactId">
+                            {{ pr.title }} ({{ pr.sourceRefName }} → {{ pr.targetRefName }})
                         </option>
                     </select>
-                    <span v-if="isLoadingBranches" class="text-xs text-primary mt-1 block">Cargando ramas...</span>
+                    <span v-if="isLoadingPullRequests" class="text-xs text-primary mt-1 block">Cargando solicitudes de extracción...</span>
                 </div>
             </div>
 
@@ -129,7 +132,7 @@ const submitLink = async () => {
                 </button>
                 <button 
                     @click="submitLink"
-                    :disabled="!selectedRepo || !selectedBranch || isSubmitting"
+                    :disabled="!selectedRepo || !selectedArtifactId || isSubmitting"
                     class="px-4 py-2 rounded bg-primary-container text-on-primary-container text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                 >
                     <span v-if="isSubmitting" class="material-symbols-outlined animate-spin text-sm">sync</span>
