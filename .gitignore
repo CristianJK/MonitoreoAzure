@@ -1,1 +1,3 @@
 azure-dashboard-web/.env
+azure-dashboard-web/.agents/*
+azure-dashboard-api/.agents/*
