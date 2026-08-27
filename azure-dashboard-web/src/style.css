@@ -2,9 +2,12 @@
 
 @theme {
   --color-secondary: #c2c7d0;
+  --color-secondary-container: #1a2a3a;
+  --color-on-secondary-container: #dae3ee;
   --color-surface-variant: #2d363e;
   --color-on-surface: #dae3ee;
   --color-primary-container: #0078d4;
+  --color-on-primary-container: #dae3ee;
   --color-on-surface-variant: #c0c7d4;
   --color-surface-bright: #313a43;
   --color-on-primary: #00315c;
@@ -17,6 +20,10 @@
   --color-surface-container-high: #222b33;
   --color-surface-container-highest: #2d363e;
   --color-error: #ffb4ab;
+  --color-success: #4ade80;
+  --color-on-success: #052e16;
+  --color-warning: #fbbf24;
+  --color-on-warning: #422006;
 }
 
 .material-symbols-outlined {
@@ -25,4 +32,38 @@
     'wght' 400,
     'GRAD' 0,
     'opsz' 24;
+}
+
+/* Scrollbar personalizado */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-on-surface-variant);
+}
+
+/* Focus visible global para accesibilidad */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Input glow effect */
+.input-glow:focus-within {
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* Transiciones suaves */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

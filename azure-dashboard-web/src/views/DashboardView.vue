@@ -7,6 +7,9 @@ import LinkBranchModal from '@/components/LinkBranchModal.vue';
 
 // Estado reactivo
 const workItems = ref<WorkItem[]>([]);
+const emit = defineEmits<{
+    selectWorkItem: [workItem: WorkItem];
+}>();
 const isLoading = ref<boolean>(true);
 const errorMessage = ref<string | null>(null);
 
@@ -86,7 +89,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <main class="flex-1 md:ml-64 pt-16 p-6 overflow-y-auto min-h-screen bg-background">
+    <main class="flex-1 p-6 overflow-y-auto min-h-screen bg-background">
         <div class="max-w-7xl mx-auto space-y-8">
             
             <!-- Header Section -->
@@ -96,14 +99,14 @@ onMounted(() => {
                     <p class="text-sm text-on-surface-variant mt-1">Métricas en tiempo real y tareas activas de Azure DevOps.</p>
                 </div>
                 <div class="flex gap-3">
-                    <button class="bg-surface-variant border border-outline-variant text-on-surface px-4 py-2 rounded-md font-body-sm text-body-sm hover:bg-surface-bright transition-colors flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">filter_list</span>
-                                            Filter
-                                        </button>
-                    <button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-md font-body-sm text-body-sm hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm">
-                    <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">add</span>
-                                            New Item
-                                        </button>
+                    <button class="bg-surface-variant border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-body-sm text-body-sm hover:bg-surface-bright transition-colors flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">filter_list</span>
+                        Filter
+                    </button>
+                    <button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-lg font-body-sm text-body-sm hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm">
+                        <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;" aria-hidden="true">add</span>
+                        New Item
+                    </button>
                 </div>
             </div>
 
@@ -111,38 +114,38 @@ onMounted(() => {
                 <CardsWorkItme
                     title="Done"
                     :value="summary.done"
-                    description="Asignados a ti"
+                    description="Completados"
                     icon="check_circle"
                     accent-class="bg-success"
                 />
                 <CardsWorkItme
                     title="In Progress"
                     :value="summary.inProgress"
-                    description="Asignados a ti"
+                    description="En progreso"
                     icon="sync"
                     accent-class="bg-primary-container"
                 />
                 <CardsWorkItme
                     title="To Do"
                     :value="summary.toDo"
-                    description="Asignados a ti"
+                    description="Pendientes"
                     icon="assignment"
                     accent-class="bg-secondary"
                 />
             </div>
 
             <!-- Tabla de Work Items -->
-            <div class="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+            <div class="bg-surface-container border border-outline-variant rounded-xl overflow-hidden flex flex-col">
                 <div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-high">
                     <h2 class="text-lg font-medium text-on-surface">Work Items</h2>
-                    <button class="bg-surface-variant border border-primary text-primary px-3 py-1.5 rounded-md font-body-sm text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2 group">
-                        <span class="material-symbols-outlined text-[16px] group-hover:animate-spin-slow">auto_awesome</span>
+                    <button class="bg-surface-variant border border-primary text-primary px-3 py-1.5 rounded-lg font-body-sm text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2 group">
+                        <span class="material-symbols-outlined text-[16px] group-hover:animate-spin-slow" aria-hidden="true">auto_awesome</span>
                         Daily Comment Automation
                     </button>
                 </div>
 
                 <!-- Headers -->
-                <div class="grid grid-cols-12 gap-4 px-4 py-2 border-b border-outline-variant bg-surface-container-low text-xs font-bold text-on-surface-variant uppercase">
+                <div class="grid grid-cols-12 gap-4 px-4 py-2.5 border-b border-outline-variant bg-surface-container-low text-xs font-bold text-on-surface-variant uppercase">
                     <div class="col-span-1">ID</div>
                     <div class="col-span-5">Title</div>
                     <div class="col-span-2">State</div>
@@ -152,11 +155,11 @@ onMounted(() => {
 
                 <!-- Estados -->
                 <div v-if="isLoading" class="p-8 text-center text-on-surface-variant">
-                    <span class="material-symbols-outlined animate-spin text-4xl mb-2">sync</span>
+                    <span class="material-symbols-outlined animate-spin text-4xl mb-2" aria-hidden="true">sync</span>
                     <p>Cargando datos desde Azure...</p>
                 </div>
 
-                <div v-else-if="errorMessage" class="p-8 text-center text-error bg-error/10">
+                <div v-else-if="errorMessage" class="p-8 text-center text-error bg-error/10 rounded-lg mx-4 my-4">
                     <p>{{ errorMessage }}</p>
                 </div>
 
@@ -165,12 +168,17 @@ onMounted(() => {
                     <div 
                         v-for="item in workItems" 
                         :key="item.id"
-                        class="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-surface-variant transition-colors group"
+                        class="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-surface-variant transition-colors group cursor-pointer"
+                        role="button"
+                        tabindex="0"
+                        @click="emit('selectWorkItem', item)"
+                        @keydown.enter="emit('selectWorkItem', item)"
+                        @keydown.space.prevent="emit('selectWorkItem', item)"
                     >
                         <div class="col-span-1 font-mono text-sm text-primary">{{ item.id }}</div>
                         
                         <div class="col-span-5 flex items-center gap-2">
-                            <span class="material-symbols-outlined text-base" :class="getColorByType(item.type)">
+                            <span class="material-symbols-outlined text-base" :class="getColorByType(item.type)" aria-hidden="true">
                                 {{ getIconByType(item.type) }}
                             </span>
                             <span class="text-sm text-on-surface truncate" :title="item.title">
@@ -180,7 +188,7 @@ onMounted(() => {
                         
                         <div class="col-span-2">
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary border border-primary/30 text-xs">
-                                <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-primary" aria-hidden="true"></span>
                                 {{ item.state }}
                             </span>
                         </div>
@@ -193,10 +201,13 @@ onMounted(() => {
                         </div>
                         
                         <div class="col-span-1 flex justify-end">
-                            <button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-bright transition-colors" title="Vincular Rama"
-                                @click="openLinkModal(item.id)"
+                            <button
+                                class="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-bright transition-colors"
+                                title="Vincular Rama"
+                                aria-label="Link branch to work item {{ item.id }}"
+                                @click.stop="openLinkModal(item.id)"
                             >
-                                <span class="material-symbols-outlined text-lg">account_tree</span>
+                                <span class="material-symbols-outlined text-lg" aria-hidden="true">account_tree</span>
                             </button>
                         </div>
                     </div>
