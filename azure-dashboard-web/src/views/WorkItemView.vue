@@ -67,7 +67,11 @@ const typeColor = computed(() => {
         <div class="bg-surface-container-high border-b border-outline-variant px-4 md:px-6 py-4 shrink-0">
             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2.5 mb-2">
+                    <h1 class="text-on-surface font-bold text-headline-lg leading-tight">
+                        {{ workItem.title }}
+                    </h1>
+                    <div class="flex items-center gap-2.5 mt-4">
+                        
                         <span
                             class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border"
                             :class="stateColor"
@@ -80,17 +84,24 @@ const typeColor = computed(() => {
                             {{ workItem.type }}
                         </span>
                     </div>
-                    <h1 class="text-on-surface font-headline-md text-headline-md leading-tight">
-                        {{ workItem.title }}
-                    </h1>
+                    
                 </div>
-                <div class="flex gap-2 shrink-0">
-                    <button
-                        class="flex items-center gap-2 px-3 py-2 bg-surface-variant hover:bg-outline-variant text-on-surface text-sm rounded-lg border border-outline-variant transition-colors"
-                    >
-                        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">share</span>
-                        <span class="hidden sm:inline">Share</span>
-                    </button>
+                <div class="flex gap-3 shrink-0">      
+                    <div class="relative">                        
+                        <select
+                            id="work-item-state"
+                            class="w-full bg-background border border-outline-variant rounded-lg p-2.5 text-on-surface font-body-sm text-body-sm appearance-none input-glow cursor-pointer pr-8"
+                            :value="workItem.state"
+                        >
+                            <option>New</option>
+                            <option>To Do</option>
+                            <option>In Progress</option>
+                            <option>In Review</option>
+                            <option>Done</option>
+                            <option>Removed</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]" aria-hidden="true">expand_more</span>
+                    </div>              
                     <button
                         class="flex items-center gap-2 px-4 py-2 bg-primary-container hover:opacity-90 text-on-primary-container text-sm font-medium rounded-lg transition-opacity shadow-sm"
                     >
@@ -109,52 +120,9 @@ const typeColor = computed(() => {
                 <section class="bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
                     <div class="bg-surface-variant border-b border-outline-variant px-4 py-3 flex justify-between items-center">
                         <h2 class="font-headline-sm text-headline-sm text-on-surface">Description</h2>
-                        <div class="flex gap-1">
-                            <button
-                                class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-background rounded-lg transition-colors"
-                                aria-label="Edit description"
-                            >
-                                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">edit</span>
-                            </button>
-                            <button
-                                class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-background rounded-lg transition-colors"
-                                aria-label="Fullscreen description"
-                            >
-                                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">fullscreen</span>
-                            </button>
-                        </div>
-                    </div>
-                    <!-- Rich Text Toolbar -->
-                    <div class="bg-background border-b border-outline-variant px-3 py-2 flex gap-1 items-center flex-wrap">
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Bold">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">format_bold</span>
-                        </button>
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Italic">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">format_italic</span>
-                        </button>
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Underline">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">format_underlined</span>
-                        </button>
-                        <div class="w-px h-4 bg-outline-variant mx-1" aria-hidden="true"></div>
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Bullet list">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">format_list_bulleted</span>
-                        </button>
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Numbered list">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">format_list_numbered</span>
-                        </button>
-                        <div class="w-px h-4 bg-outline-variant mx-1" aria-hidden="true"></div>
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Code block">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">code</span>
-                        </button>
-                        <button class="p-1.5 text-on-surface hover:bg-surface-variant rounded-lg transition-colors" aria-label="Insert link">
-                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">link</span>
-                        </button>
-                    </div>
+                    </div>                    
                     <div
-                        class="p-4 font-body-md text-body-md text-on-surface leading-relaxed min-h-[180px] outline-none"
-                        contenteditable="true"
-                        role="textbox"
-                        aria-multiline="true"
+                        class="p-4 font-body-md text-body-md text-on-surface leading-relaxed min-h-[180px] outline-none"                        
                         aria-label="Description content"
                     >
                         <p class="mb-3">Implementar la lógica de generación de PINs versión 3.0 para el módulo ARQ-VTA.</p>
@@ -271,27 +239,30 @@ const typeColor = computed(() => {
 
             <!-- Right Column: Metadata / Sidebar -->
             <aside class="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-outline-variant bg-surface-container-highest overflow-y-auto custom-scrollbar flex flex-col shrink-0">
-                <!-- Deployment Status -->
-                <div class="p-4 border-b border-outline-variant">
-                    <h3 class="font-label-caps text-label-caps text-on-surface-variant mb-3">Deployment</h3>
-                    <div class="flex items-center gap-3 bg-surface-variant p-3 rounded-lg border border-outline-variant">
-                        <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">cloud_sync</span>
-                        <div class="flex-1 min-w-0">
-                            <div class="font-body-sm text-body-sm font-semibold text-on-surface">Development Env</div>
-                            <div class="text-on-surface-variant text-[11px]">Last deployed 2hrs ago</div>
-                        </div>
-                        <span class="material-symbols-outlined text-success text-[18px]" title="Success" aria-label="Deploy success">check_circle</span>
-                    </div>
-                </div>
-
                 <!-- Production Readiness Checklist -->
-                <div class="p-4 border-b border-outline-variant bg-surface-container-high relative overflow-hidden">
+                <div class="flex-1 p-4 border-b border-outline-variant bg-surface-container-high relative overflow-hidden">
                     <div class="absolute top-0 left-0 w-1 h-full bg-primary" aria-hidden="true"></div>
                     <h3 class="font-label-caps text-label-caps text-primary font-bold mb-3 flex items-center gap-1.5">
                         <span class="material-symbols-outlined text-[16px]" aria-hidden="true">fact_check</span>
                         Production Readiness
                     </h3>
                     <div class="flex flex-col gap-2">
+                        <!-- WO creacion de rama -->
+                        <div class="flex flex-col gap-1 p-2.5 bg-surface-variant rounded-lg border border-outline-variant group">
+                            <div class="flex items-start gap-2.5">
+                                <span class="material-symbols-outlined text-success text-[16px] shrink-0 mt-[2px]" aria-hidden="true">check_circle</span>
+                                <div class="flex-1 flex flex-col min-w-0">
+                                    <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">Solicitud de Rama</span>
+                                    <a class="text-primary text-[11px] hover:underline" href="#">#WO-12334566789</a>
+                                </div>
+                                <button
+                                    class="text-on-surface-variant hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+                                    aria-label="Add comment to PR"
+                                >
+                                    <span class="material-symbols-outlined text-[14px]" aria-hidden="true">add_comment</span>
+                                </button>
+                            </div>
+                        </div>
                         <!-- PR Associated -->
                         <div class="flex flex-col gap-1 p-2.5 bg-surface-variant rounded-lg border border-outline-variant group">
                             <div class="flex items-start gap-2.5">
@@ -314,8 +285,42 @@ const typeColor = computed(() => {
                             <div class="flex items-start gap-2.5">
                                 <span class="material-symbols-outlined text-on-surface-variant text-[16px] shrink-0 mt-[2px]" aria-hidden="true">radio_button_unchecked</span>
                                 <div class="flex-1 flex flex-col min-w-0">
-                                    <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">Documentación Completada</span>
-                                    <span class="text-on-surface-variant text-[11px]">Pendiente de revisión</span>
+                                    <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">Manual Tecnico</span>
+                                    <span class="text-on-surface-variant text-[11px]">Sin manual tecnico</span>
+                                </div>
+                                <button
+                                    class="text-on-surface-variant hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+                                    aria-label="Add comment to documentation"
+                                >
+                                    <span class="material-symbols-outlined text-[14px]" aria-hidden="true">add_comment</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Documentation -->
+                        <div class="flex flex-col gap-1 p-2.5 bg-surface-variant rounded-lg border border-outline-variant group">
+                            <div class="flex items-start gap-2.5">
+                                <span class="material-symbols-outlined text-on-surface-variant text-[16px] shrink-0 mt-[2px]" aria-hidden="true">radio_button_unchecked</span>
+                                <div class="flex-1 flex flex-col min-w-0">
+                                    <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">Pruebas Unitarias</span>
+                                    <span class="text-on-surface-variant text-[11px]">Sin pruebas unitarias</span>
+                                </div>
+                                <button
+                                    class="text-on-surface-variant hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
+                                    aria-label="Add comment to documentation"
+                                >
+                                    <span class="material-symbols-outlined text-[14px]" aria-hidden="true">add_comment</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Documentation -->
+                        <div class="flex flex-col gap-1 p-2.5 bg-surface-variant rounded-lg border border-outline-variant group">
+                            <div class="flex items-start gap-2.5">
+                                <span class="material-symbols-outlined text-on-surface-variant text-[16px] shrink-0 mt-[2px]" aria-hidden="true">radio_button_unchecked</span>
+                                <div class="flex-1 flex flex-col min-w-0">
+                                    <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">Minutograma</span>
+                                    <span class="text-on-surface-variant text-[11px]">Sin minutograma</span>
                                 </div>
                                 <button
                                     class="text-on-surface-variant hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
@@ -328,11 +333,12 @@ const typeColor = computed(() => {
 
                         <!-- Standards Validation -->
                         <div class="flex flex-col gap-1 p-2.5 bg-surface-variant rounded-lg border border-outline-variant group">
-                            <div class="flex items-start gap-2.5">
-                                <span class="material-symbols-outlined text-success text-[16px] shrink-0 mt-[2px]" aria-hidden="true">check_circle</span>
+                            <div class="flex items-start gap-2.5">                                
+                                <span class="material-symbols-outlined text-on-surface-variant text-[16px] shrink-0 mt-[2px]" aria-hidden="true">radio_button_unchecked</span>
                                 <div class="flex-1 flex flex-col min-w-0">
                                     <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">Validación de Estándares</span>
-                                    <span class="text-success text-[11px]">Aprobado</span>
+                                    <!--<span class="text-success text-[11px]">Aprobado</span>-->
+                                    <span class="text-on-surface-variant text-[11px]">Sin cumplir con estándares</span>
                                 </div>
                                 <button
                                     class="text-on-surface-variant hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded"
@@ -361,119 +367,17 @@ const typeColor = computed(() => {
                         </div>
                     </div>
                 </div>
-
-                <!-- Core Metadata -->
-                <div class="p-4 flex flex-col gap-4">
-                    <!-- State -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-state">State</label>
-                        <div class="relative">
-                            <select
-                                id="work-item-state"
-                                class="w-full bg-background border border-outline-variant rounded-lg p-2.5 text-on-surface font-body-sm text-body-sm appearance-none input-glow cursor-pointer pr-8"
-                                :value="workItem.state"
-                            >
-                                <option>New</option>
-                                <option>To Do</option>
-                                <option>In Progress</option>
-                                <option>In Review</option>
-                                <option>Done</option>
-                                <option>Removed</option>
-                            </select>
-                            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]" aria-hidden="true">expand_more</span>
-                        </div>
-                    </div>
-
-                    <!-- Assigned To -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-assignee">Assigned To</label>
-                        <div class="flex items-center gap-2.5 p-2.5 bg-background border border-outline-variant rounded-lg input-glow">
-                            <div class="w-6 h-6 rounded-full bg-surface-bright flex items-center justify-center text-[10px] font-bold text-on-surface border border-outline-variant">
-                                {{ workItem.assigned_to?.charAt(0) || '?' }}
-                            </div>
-                            <span class="font-body-sm text-body-sm text-on-surface flex-1 truncate">{{ workItem.assigned_to }}</span>
-                            <button class="text-on-surface-variant hover:text-error p-0.5 rounded transition-colors" aria-label="Remove assignee">
-                                <span class="material-symbols-outlined text-[14px]" aria-hidden="true">close</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Area & Iteration -->
-                    <div class="flex flex-col gap-1.5 border-t border-outline-variant pt-4 mt-1">
-                        <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-area">Area</label>
-                        <div class="flex items-center bg-background border border-outline-variant rounded-lg p-2.5 input-glow cursor-text group">
-                            <span class="font-body-sm text-body-sm text-on-surface flex-1 truncate">ARQ\Security\Auth</span>
-                            <button class="text-on-surface-variant text-[14px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5" aria-label="Edit area">
-                                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-iteration">Iteration</label>
-                        <div class="flex items-center bg-background border border-outline-variant rounded-lg p-2.5 input-glow cursor-text group">
-                            <span class="font-body-sm text-body-sm text-on-surface flex-1 truncate">Sprint 42 (Q3)</span>
-                            <button class="text-on-surface-variant text-[14px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5" aria-label="Edit iteration">
-                                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Planning Metrics -->
-                    <div class="grid grid-cols-2 gap-3 border-t border-outline-variant pt-4 mt-1">
-                        <div class="flex flex-col gap-1.5">
-                            <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-priority">Priority</label>
-                            <input
-                                id="work-item-priority"
-                                class="w-full bg-background border border-outline-variant rounded-lg p-2.5 text-on-surface font-body-sm text-body-sm input-glow"
-                                type="number"
-                                value="2"
-                            />
-                        </div>
-                        <div class="flex flex-col gap-1.5">
-                            <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-effort">Effort</label>
-                            <input
-                                id="work-item-effort"
-                                class="w-full bg-background border border-outline-variant rounded-lg p-2.5 text-on-surface font-body-sm text-body-sm input-glow"
-                                type="number"
-                                value="8"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tags -->
-                <div class="p-4 border-t border-outline-variant">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-label-caps text-label-caps text-on-surface-variant">Tags</h3>
-                        <button class="text-primary hover:text-primary-fixed text-[11px] font-semibold transition-colors">Add Tag</button>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">
-                        <span class="px-2.5 py-1 bg-surface-variant border border-outline-variant rounded-lg text-[11px] text-on-surface flex items-center gap-1.5">
-                            security
-                            <button class="hover:text-error transition-colors p-0.5" aria-label="Remove security tag">
-                                <span class="material-symbols-outlined text-[12px]" aria-hidden="true">close</span>
-                            </button>
-                        </span>
-                        <span class="px-2.5 py-1 bg-surface-variant border border-outline-variant rounded-lg text-[11px] text-on-surface flex items-center gap-1.5">
-                            v3-migration
-                            <button class="hover:text-error transition-colors p-0.5" aria-label="Remove v3-migration tag">
-                                <span class="material-symbols-outlined text-[12px]" aria-hidden="true">close</span>
-                            </button>
-                        </span>
-                        <span class="px-2.5 py-1 bg-primary-container/15 border border-primary/30 text-primary rounded-lg text-[11px] flex items-center gap-1.5" title="Critical Path">
-                            <span class="material-symbols-outlined text-[12px]" aria-hidden="true">warning</span>
-                            critical-path
-                            <button class="hover:text-on-surface transition-colors p-0.5" aria-label="Remove critical-path tag">
-                                <span class="material-symbols-outlined text-[12px]" aria-hidden="true">close</span>
-                            </button>
-                        </span>
-                    </div>
-                </div>
-
                 <!-- System Info -->
                 <div class="mt-auto p-4 border-t border-outline-variant text-on-surface-variant font-label-mono text-[10px] space-y-1 opacity-60">
                     <p>Creado por System Admin el Oct 24, 2023</p>
                     <p>Actualizado por David Miller hace 2 hrs</p>
+                    <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-assignee">Assigned To</label>
+                    <div class="flex items-center gap-2.5 p-2.5">
+                        <div class="w-6 h-6 rounded-full bg-surface-bright flex items-center justify-center text-[10px] font-bold text-on-surface border border-outline-variant">
+                            {{ workItem.assigned_to?.charAt(0) || '?' }}
+                        </div>
+                        <span class="font-body-sm text-body-sm text-on-surface flex-1 truncate">{{ workItem.assigned_to }}</span>
+                    </div>
                 </div>
             </aside>
         </div>
