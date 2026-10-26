@@ -275,7 +275,23 @@ class AzureDevOpsService
             'comments' => $comments,
             'history' => $history,
             'relations' => $workItem['relations'] ?? [],
+            'pull_requests' => $this->getLinkedPullRequests($workItem['relations'] ?? []),
         ];
+    }
+
+    /**
+     * Detalle de los PRs enlazados al work item. Si un PR no se puede consultar
+     * (borrado, sin permisos) se devuelve igual con el error, para que se vea el enlace.
+     */
+    protected function getLinkedPullRequests(array $relations): array
+    {
+        return array_map(function (array $link) {
+            $pr = $this->getPullRequest($link['repositoryId'], $link['pullRequestId']);
+
+            return isset($pr['error'])
+                ? ['id' => $link['pullRequestId'], 'repositoryId' => $link['repositoryId'], 'error' => $pr['error']]
+                : $pr;
+        }, self::parseArtifactLinks($relations)['pull_requests']);
     }
 
     // ---------------------------------------------------------------------
@@ -647,6 +663,8 @@ class AzureDevOpsService
                 'id' => $pr['pullRequestId'],
                 'title' => $pr['title'] ?? '',
                 'status' => $pr['status'] ?? '',
+                'isDraft' => (bool) ($pr['isDraft'] ?? false),
+                'creationDate' => $pr['creationDate'] ?? null,
                 'repositoryId' => $repositoryId,
                 'repository' => $repoName,
                 'sourceBranch' => str_replace('refs/heads/', '', $pr['sourceRefName'] ?? ''),

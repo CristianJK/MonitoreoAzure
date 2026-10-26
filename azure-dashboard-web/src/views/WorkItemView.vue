@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { workItemService, type WorkItem, type WorkItemState } from '@/services/workItemService';
+import { workItemService, type LinkedPullRequest, type WorkItem, type WorkItemState } from '@/services/workItemService';
 import { agentService, type AgentApproval } from '@/services/agentService';
 import { errorMessage } from '@/services/apiClient';
 import type { ChecklistItem, WorkItemChecklist as Checklist } from '@/services/checklistService';
@@ -58,6 +58,19 @@ watch(workItemId, () => {
 
 const commentsCount = computed(() =>
     (workItemData.value?.comments?.length || 0) + (workItemData.value?.history?.length || 0));
+
+// ---------------------------------------------------------------------------
+// Pull Requests asociados
+// ---------------------------------------------------------------------------
+const pullRequestStatus = (pr: LinkedPullRequest): { label: string; classes: string } => {
+    if (pr.isDraft && pr.status === 'active') return { label: 'Borrador', classes: 'bg-surface-variant text-on-surface-variant' };
+    switch (pr.status) {
+        case 'active': return { label: 'Activo', classes: 'bg-primary-container text-on-primary-container' };
+        case 'completed': return { label: 'Completado', classes: 'bg-success text-on-success' };
+        case 'abandoned': return { label: 'Abandonado', classes: 'bg-surface-variant text-on-surface-variant line-through' };
+        default: return { label: pr.status || 'Desconocido', classes: 'bg-surface-variant text-on-surface-variant' };
+    }
+};
 
 // ---------------------------------------------------------------------------
 // Comentarios
@@ -407,6 +420,43 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                             <dd class="text-on-surface truncate" :title="workItemData.iteration_path">{{ workItemData.iteration_path }}</dd>
                         </div>
                     </dl>
+                </div>
+
+                <!-- Pull Requests asociados -->
+                <div class="p-4 border-b border-outline-variant">
+                    <h3 class="font-label-caps text-label-caps uppercase text-primary mb-3 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">merge</span>
+                        Pull Requests
+                        <span class="ml-auto bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-full font-label-mono text-[10px] normal-case">{{ workItemData.pull_requests?.length ?? 0 }}</span>
+                    </h3>
+                    <ul v-if="workItemData.pull_requests?.length" class="flex flex-col gap-2">
+                        <li v-for="pr in workItemData.pull_requests" :key="`${pr.repositoryId}-${pr.id}`" class="p-2.5 bg-surface-container rounded-lg border border-outline-variant text-xs">
+                            <template v-if="pr.error">
+                                <p class="font-semibold text-on-surface">PR !{{ pr.id }}</p>
+                                <p class="text-error mt-0.5 break-words">No se pudo consultar en Azure DevOps</p>
+                            </template>
+                            <template v-else>
+                                <div class="flex items-start justify-between gap-2">
+                                    <a
+                                        :href="pr.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-body-sm text-primary hover:underline font-semibold min-w-0 break-words"
+                                    >PR !{{ pr.id }} · {{ pr.title }}</a>
+                                    <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold" :class="pullRequestStatus(pr).classes">{{ pullRequestStatus(pr).label }}</span>
+                                </div>
+                                <p class="mt-1.5 flex items-center gap-1 font-label-mono text-[11px] text-on-surface-variant min-w-0">
+                                    <span class="truncate" :title="pr.sourceBranch">{{ pr.sourceBranch }}</span>
+                                    <span class="material-symbols-outlined text-[14px] shrink-0" aria-label="hacia">arrow_forward</span>
+                                    <span class="truncate" :title="pr.targetBranch">{{ pr.targetBranch }}</span>
+                                </p>
+                                <p class="mt-1 text-on-surface-variant truncate">
+                                    {{ pr.repository }}<template v-if="pr.createdBy"> · {{ pr.createdBy }}</template><template v-if="pr.creationDate"> · {{ formatDate(pr.creationDate) }}</template>
+                                </p>
+                            </template>
+                        </li>
+                    </ul>
+                    <p v-else class="text-on-surface-variant italic text-xs">Sin Pull Requests asociados</p>
                 </div>
 
                 <!-- Alistamiento -->

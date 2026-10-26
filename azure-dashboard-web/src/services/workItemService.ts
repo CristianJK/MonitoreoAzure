@@ -13,6 +13,22 @@ export interface WorkItemComment {
     createdDate?: string;
 }
 
+export interface LinkedPullRequest {
+    id: number;
+    repositoryId: string;
+    title?: string;
+    status?: 'active' | 'completed' | 'abandoned' | string;
+    isDraft?: boolean;
+    creationDate?: string | null;
+    repository?: string;
+    sourceBranch?: string;
+    targetBranch?: string;
+    createdBy?: string | null;
+    url?: string;
+    /** Presente cuando el PR está enlazado pero no se pudo consultar en Azure */
+    error?: string;
+}
+
 export interface WorkItem {
     id: number;
     title: string;
@@ -30,6 +46,7 @@ export interface WorkItem {
     comments?: WorkItemComment[];
     history?: any[];
     relations?: any[];
+    pull_requests?: LinkedPullRequest[];
 }
 
 export interface WorkItemState {

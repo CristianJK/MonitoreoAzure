@@ -84,6 +84,19 @@ class ChecklistTest extends TestCase
         ])->assertJsonValidationErrors('options');
     }
 
+    public function test_empty_options_are_ignored_for_non_select_types(): void
+    {
+        Http::fake($this->fakeWorkItemTypes());
+
+        $this->postJson('/api/checklist-definitions', [
+            'label' => 'X', 'data_type' => 'text', 'work_item_state' => 'Done', 'options' => [],
+        ])->assertCreated()->assertJsonPath('data.options', []);
+
+        $this->postJson('/api/checklist-definitions', [
+            'label' => 'Y', 'data_type' => 'select', 'work_item_state' => 'Done', 'options' => [],
+        ])->assertJsonValidationErrors('options');
+    }
+
     public function test_cannot_change_data_type_with_values(): void
     {
         Http::fake($this->fakeWorkItemTypes());

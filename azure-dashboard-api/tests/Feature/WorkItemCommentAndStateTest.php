@@ -29,6 +29,35 @@ class WorkItemCommentAndStateTest extends TestCase
         });
     }
 
+    public function test_show_includes_linked_pull_requests(): void
+    {
+        Http::fake([
+            '*/_apis/wit/workItems/10/comments*' => Http::response(['comments' => []]),
+            '*/_apis/wit/workItems/10/updates*' => Http::response(['value' => []]),
+            '*/_apis/wit/workitems/10*' => Http::response($this->workItemResponse(10, [], [
+                ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/PullRequestId/proj%2Frepo-1%2F700'],
+                ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/PullRequestId/proj/repo-1/701'],
+                ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/Ref/proj/repo-1/GBfeature/login'],
+            ])),
+            '*/pullrequests/700*' => Http::response([
+                'pullRequestId' => 700, 'title' => 'Login', 'status' => 'active', 'isDraft' => true,
+                'sourceRefName' => 'refs/heads/feature/login', 'targetRefName' => 'refs/heads/develop',
+                'repository' => ['name' => 'repo-web'], 'createdBy' => ['displayName' => 'Ana'],
+            ]),
+            '*/pullrequests/701*' => Http::response(['message' => 'No existe'], 404),
+        ]);
+
+        $this->getJson('/api/work-items/10')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.pull_requests')
+            ->assertJsonPath('data.pull_requests.0.id', 700)
+            ->assertJsonPath('data.pull_requests.0.isDraft', true)
+            ->assertJsonPath('data.pull_requests.0.sourceBranch', 'feature/login')
+            ->assertJsonPath('data.pull_requests.0.repository', 'repo-web')
+            ->assertJsonPath('data.pull_requests.1.id', 701)
+            ->assertJsonPath('data.pull_requests.1.error', fn ($error) => str_contains($error, 'No existe'));
+    }
+
     public function test_comment_text_is_required(): void
     {
         $this->postJson('/api/work-items/10/comments', ['text' => ''])->assertUnprocessable();
