@@ -20,7 +20,7 @@ class AzureRepositoryController extends Controller
         $repos = $this->azureDevOpsService->getRepositories();
 
         if (isset($repos['error'])) {
-            return response()->json(['message' => $repos['error']], 500);
+            return $this->azureError($repos);
         }
 
         return response()->json($repos);
@@ -31,19 +31,18 @@ class AzureRepositoryController extends Controller
         $branches = $this->azureDevOpsService->getBranches($repositoryId);
 
         if (isset($branches['error'])) {
-            return response()->json(['message' => $branches['error']], 500);
+            return $this->azureError($branches);
         }
 
         return response()->json($branches);
     }
-
 
     public function pullRequests($repositoryId): JsonResponse
     {
         $prs = $this->azureDevOpsService->getActivePullRequests($repositoryId);
 
         if (isset($prs['error'])) {
-            return response()->json(['message' => $prs['error']], 500);
+            return $this->azureError($prs);
         }
 
         return response()->json($prs);

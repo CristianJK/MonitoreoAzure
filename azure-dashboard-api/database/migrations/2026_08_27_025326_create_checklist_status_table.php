@@ -14,11 +14,16 @@ return new class extends Migration
         Schema::create('checklist_status', function (Blueprint $table) {
             $table->id();
             $table->foreignId('work_item_metadata_id')->constrained('work_item_metadata')->cascadeOnDelete();
-            $table->foreignId('checklist_definition_id')->constrained('checklist_definitions')->cascadeOnDelete();
+            // Las definiciones se eliminan con soft delete, por eso no se borra en cascada
+            $table->foreignId('checklist_definition_id')->constrained('checklist_definitions')->restrictOnDelete();
             $table->string('status')->default('pending');  // pending | in_progress | done | failed | skipped
-            $table->string('checked_by')->nullable(); // 'system' | 'agent:code-reviewer' | user_id
-            $table->timestamp('checked_at')->nullable();            
+            $table->text('value')->nullable(); // se interpreta según checklist_definitions.data_type
+            $table->text('notes')->nullable();
+            $table->string('checked_by')->nullable(); // 'system' | 'agent:code-reviewer' | user
+            $table->timestamp('checked_at')->nullable();
             $table->timestamps();
+
+            $table->unique(['work_item_metadata_id', 'checklist_definition_id']);
         });
     }
 

@@ -53,7 +53,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/work-items?page=1&limit=10&assigned_to=@Me",
+              "raw": "{{baseUrl}}/api/work-items?page=1&limit=10&assigned_to=@Me&state[]=In Progress&search=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -64,22 +64,130 @@
               "query": [
                 {
                   "key": "page",
-                  "value": "1",
-                  "description": "Número de página (default: 1)"
+                  "value": "1"
                 },
                 {
                   "key": "limit",
-                  "value": "10",
-                  "description": "Elementos por página (default: 10)"
+                  "value": "10"
                 },
                 {
                   "key": "assigned_to",
-                  "value": "@Me",
-                  "description": "Filtro de asignado (default: @Me)"
+                  "value": "@Me"
+                },
+                {
+                  "key": "state[]",
+                  "value": "In Progress"
+                },
+                {
+                  "key": "search",
+                  "value": ""
                 }
               ]
             },
-            "description": "Devuelve los Work Items activos con paginación y resumen por estado."
+            "description": "Paginado. Filtros opcionales: assigned_to (@Me o correo), state[], type[], search (ID o título)."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Work Item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}"
+              ]
+            },
+            "description": "Detalle con comentarios, historial y relaciones."
+          },
+          "response": []
+        },
+        {
+          "name": "Agregar comentario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "comments"
+              ]
+            },
+            "description": "Publica un comentario en Azure DevOps. El texto se recibe en markdown y se envía como HTML.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Avance del día:\\n- **Ajuste** del motor de reglas\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/state",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "state"
+              ]
+            },
+            "description": "Valida que el estado exista para el tipo. Un error de reglas de Azure se devuelve como 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"Task\",\n  \"state\": \"In Progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "response": []
         },
@@ -164,6 +272,414 @@
       ]
     },
     {
+      "name": "Tipos de Work Item y usuarios",
+      "item": [
+        {
+          "name": "Tipos de Work Item con estados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-item-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-item-types"
+              ]
+            },
+            "description": "Tipos habilitados del proyecto con sus estados (cache 24 h)."
+          },
+          "response": []
+        },
+        {
+          "name": "Estados de un tipo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-item-types/Task/states",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-item-types",
+                "Task",
+                "states"
+              ]
+            },
+            "description": "Nombre, color y categoría (Proposed, InProgress, Completed, Removed)."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users?search=torres",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "torres"
+                }
+              ]
+            },
+            "description": "Miembros de los equipos del proyecto (cache 1 h)."
+          },
+          "response": []
+        },
+        {
+          "name": "Usuario actual (dueño del PAT)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            },
+            "description": "Usuario autenticado con el PAT."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Alistamiento",
+      "item": [
+        {
+          "name": "Listar definiciones",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/checklist-definitions?state=&type=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "checklist-definitions"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": ""
+                },
+                {
+                  "key": "type",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Filtros opcionales: state, type."
+          },
+          "response": []
+        },
+        {
+          "name": "Tipos de dato y orígenes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/checklist-definitions/data-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "checklist-definitions",
+                "data-types"
+              ]
+            },
+            "description": "Catálogo para el formulario."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear definición",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/checklist-definitions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "checklist-definitions"
+              ]
+            },
+            "description": "work_item_state debe existir en Azure para applies_to_type (o en algún tipo si es null).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Manual Técnico\",\n  \"data_type\": \"sharepoint_link\",\n  \"work_item_state\": \"In Progress\",\n  \"applies_to_type\": null,\n  \"blocking\": true,\n  \"is_required\": true,\n  \"source\": \"manual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar definición",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/checklist-definitions/{{definitionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "checklist-definitions",
+                "{{definitionId}}"
+              ]
+            },
+            "description": "No permite cambiar data_type si ya hay valores registrados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Ambiente\",\n  \"data_type\": \"select\",\n  \"options\": [\n    \"DEV\",\n    \"QA\"\n  ],\n  \"work_item_state\": \"In Progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar definición",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/checklist-definitions/{{definitionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "checklist-definitions",
+                "{{definitionId}}"
+              ]
+            },
+            "description": "Soft delete: los valores registrados se conservan."
+          },
+          "response": []
+        },
+        {
+          "name": "Reordenar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/checklist-definitions/reorder",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "checklist-definitions",
+                "reorder"
+              ]
+            },
+            "description": "Actualiza sort_order.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"id\": 1,\n      \"sort_order\": 0\n    },\n    {\n      \"id\": 2,\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alistamiento de un Work Item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/checklist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "checklist"
+              ]
+            },
+            "description": "Items agrupados por estado; los automáticos (PR, rama, pipeline) se calculan desde Azure."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar valor",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/checklist/{{definitionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "checklist",
+                "{{definitionId}}"
+              ]
+            },
+            "description": "value se valida según el tipo de dato. status opcional: pending, in_progress, done, failed, skipped.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"https://empresa.sharepoint.com/sites/proyecto/manual.docx\",\n  \"status\": null,\n  \"notes\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen de varios Work Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/checklist-summary?ids[]={{workItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "checklist-summary"
+              ],
+              "query": [
+                {
+                  "key": "ids[]",
+                  "value": "{{workItemId}}"
+                }
+              ]
+            },
+            "description": "Avance del alistamiento (solo WIs que ya tienen metadatos)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Agentes",
       "item": [
         {
@@ -187,6 +703,248 @@
               ]
             },
             "description": "Devuelve el estado de los agentes de Azure DevOps."
+          },
+          "response": []
+        },
+        {
+          "name": "Proponer comentario del día (Run Azure Agent)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/agent/daily-comment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "agent",
+                "daily-comment"
+              ]
+            },
+            "description": "Revisa el PR/rama y los commits de hoy. Nunca publica: devuelve una propuesta pendiente de revisión."
+          },
+          "response": []
+        },
+        {
+          "name": "Lote: Daily Comment Automation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/daily-comment/batch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "daily-comment",
+                "batch"
+              ]
+            },
+            "description": "Encola un job por WI abierto (requiere queue:work).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assigned_to\": \"@Me\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ejecuciones del lote",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-runs?batch_id={{batchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent-runs"
+              ],
+              "query": [
+                {
+                  "key": "batch_id",
+                  "value": "{{batchId}}"
+                }
+              ]
+            },
+            "description": "Progreso del lote."
+          },
+          "response": []
+        },
+        {
+          "name": "Propuestas pendientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-approvals?status=Pendiente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent-approvals"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Pendiente"
+                }
+              ]
+            },
+            "description": "Bandeja de revisión."
+          },
+          "response": []
+        },
+        {
+          "name": "Cantidad de pendientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-approvals/pending-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent-approvals",
+                "pending-count"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Aprobar y publicar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-approvals/{{approvalId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent-approvals",
+                "{{approvalId}}",
+                "approve"
+              ]
+            },
+            "description": "Publica el texto revisado. 409 con code=already_published si ya se publicó hoy; enviar force=true para publicar igual.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Texto revisado\",\n  \"force\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Regenerar propuesta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-approvals/{{approvalId}}/regenerate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent-approvals",
+                "{{approvalId}}",
+                "regenerate"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Descartar propuesta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-approvals/{{approvalId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent-approvals",
+                "{{approvalId}}",
+                "reject"
+              ]
+            },
+            "description": ""
           },
           "response": []
         }
@@ -298,6 +1056,21 @@
     {
       "key": "artifactId",
       "value": "vstfs:///Git/PullRequestId/00000000-0000-0000-0000-000000000000%2F00000000-0000-0000-0000-000000000000%2F1",
+      "type": "string"
+    },
+    {
+      "key": "definitionId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "approvalId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "batchId",
+      "value": "",
       "type": "string"
     }
   ]

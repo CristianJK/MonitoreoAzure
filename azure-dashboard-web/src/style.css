@@ -24,6 +24,42 @@
   --color-on-success: #052e16;
   --color-warning: #fbbf24;
   --color-on-warning: #422006;
+  --color-surface: #182028;
+  --color-on-background: #dae3ee;
+
+  /* Tipografía */
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-body-sm: var(--font-sans);
+  --font-body-md: var(--font-sans);
+  --font-label-caps: var(--font-sans);
+  --font-label-mono: var(--font-mono);
+  --font-headline-sm: var(--font-sans);
+  --font-headline-lg: var(--font-sans);
+
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--line-height: 1.25rem;
+  --text-body-md: 0.875rem;
+  --text-body-md--line-height: 1.5rem;
+  --text-label-caps: 0.6875rem;
+  --text-label-caps--line-height: 1rem;
+  --text-label-caps--letter-spacing: 0.06em;
+  --text-label-caps--font-weight: 600;
+  --text-label-mono: 0.75rem;
+  --text-label-mono--line-height: 1rem;
+  --text-headline-sm: 1rem;
+  --text-headline-sm--line-height: 1.5rem;
+  --text-headline-sm--font-weight: 600;
+  --text-headline-lg: 1.75rem;
+  --text-headline-lg--line-height: 2.25rem;
+
+  --animate-spin-slow: spin 3s linear infinite;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-sans);
 }
 
 .material-symbols-outlined {
@@ -66,4 +102,115 @@
 /* Transiciones suaves */
 .transition-smooth {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Contenido HTML que viene de Azure DevOps (descripción y comentarios) */
+.rich-text {
+  overflow-wrap: anywhere;
+}
+
+.rich-text p,
+.rich-text ul,
+.rich-text ol,
+.rich-text pre,
+.rich-text table {
+  margin-block: 0.5rem;
+}
+
+.rich-text :first-child {
+  margin-top: 0;
+}
+
+.rich-text ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.rich-text ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+
+.rich-text h1,
+.rich-text h2,
+.rich-text h3 {
+  font-weight: 600;
+  margin-block: 0.75rem 0.25rem;
+}
+
+.rich-text a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.rich-text code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-surface-variant);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+}
+
+.rich-text pre {
+  background: var(--color-surface-container-lowest);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.rich-text img {
+  max-width: 100%;
+  height: auto;
+}
+
+.rich-text table {
+  border-collapse: collapse;
+}
+
+.rich-text td,
+.rich-text th {
+  border: 1px solid var(--color-outline-variant);
+  padding: 0.25rem 0.5rem;
+}
+
+/* Botones y campos de formulario compartidos */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-body-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5;
+  }
+
+  .btn-primary {
+    @apply bg-primary-container text-on-primary-container hover:bg-primary-container/85;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-variant border border-outline-variant text-on-surface hover:bg-surface-bright;
+  }
+
+  .btn-outline {
+    @apply bg-transparent border border-primary text-primary hover:bg-primary/10;
+  }
+
+  .btn-ghost {
+    @apply text-on-surface-variant hover:text-on-surface hover:bg-surface-variant;
+  }
+
+  .btn-danger {
+    @apply bg-error/15 border border-error/40 text-error hover:bg-error/25;
+  }
+
+  .field {
+    @apply w-full bg-background border border-outline-variant rounded-lg px-3 py-2 text-body-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:border-primary disabled:opacity-50;
+  }
+
+  .field-label {
+    @apply block text-label-caps font-label-caps uppercase text-on-surface-variant mb-1.5;
+  }
+
+  .field-error {
+    @apply text-[12px] text-error mt-1;
+  }
 }

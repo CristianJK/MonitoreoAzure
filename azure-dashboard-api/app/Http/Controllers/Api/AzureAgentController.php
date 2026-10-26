@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\AzureDevOpsService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class AzureAgentController extends Controller
 {
@@ -21,7 +20,7 @@ class AzureAgentController extends Controller
         $agents = $this->azureService->getAgentsStatus();
 
         if (isset($agents['error'])) {
-            return response()->json(['message' => $agents['error']], 500);
+            return $this->azureError($agents);
         }
 
         return response()->json($agents);

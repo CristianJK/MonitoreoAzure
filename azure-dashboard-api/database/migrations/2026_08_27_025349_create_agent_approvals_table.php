@@ -11,16 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-    Schema::create('agent_approvals', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('work_item_metadata_id')->constrained('work_item_metadata')->cascadeOnDelete();
-        $table->string('action_code');
-        $table->string('status')->default('Pendiente');
-        $table->string('requested_by');
-        $table->string('resolved_by')->nullable();        
-        $table->timestamps();
-        $table->timestamp('resolved_at')->nullable();
-    });
+        Schema::create('agent_approvals', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('work_item_metadata_id')->constrained('work_item_metadata')->cascadeOnDelete();
+            $table->string('action_code'); // daily_comment | daily_comment_manual
+            $table->string('status')->default('Pendiente'); // Pendiente | Publicado | Rechazado | Reemplazado | Vencido | Error
+            $table->string('requested_by'); // manual | batch | scheduled
+            $table->string('resolved_by')->nullable();
+            $table->json('payload')->nullable(); // propuesta + contexto (PRs, commits) enviado al agente
+            $table->json('result')->nullable(); // respuesta de Azure al publicar
+            $table->timestamps();
+            $table->timestamp('resolved_at')->nullable();
+
+            $table->index(['status', 'created_at']);
+        });
     }
 
     /**
