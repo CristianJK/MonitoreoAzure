@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import DashboardView from './views/DashboardView.vue';
-import WorkItemView from './views/WorkItemView.vue';
+import { useRouter } from 'vue-router';
 import type { WorkItem } from './services/workItemService';
 
-const selectedWorkItem = ref<WorkItem | null>(null);
+const router = useRouter();
 
 const showWorkItem = (workItem: WorkItem) => {
-  selectedWorkItem.value = workItem;
+  router.push({ name: 'work-item', params: { id: workItem.id } });
 };
 
 const showDashboard = () => {
-  selectedWorkItem.value = null;
+  router.push({ name: 'dashboard' });
 };
 </script>
 
@@ -66,12 +64,7 @@ const showDashboard = () => {
 
     <!-- Vista Principal -->
     <div class="flex-1 flex flex-col pt-14 md:ml-64">
-      <WorkItemView
-        v-if="selectedWorkItem"
-        :work-item="selectedWorkItem"
-        @back="showDashboard"
-      />
-      <DashboardView v-else @select-work-item="showWorkItem" />
+      <router-view @select-work-item="showWorkItem" @back="showDashboard" />
     </div>
 
   </div>

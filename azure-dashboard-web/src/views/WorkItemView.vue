@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { workItemService, type WorkItem } from '@/services/workItemService';
 
 const props = defineProps<{
-    workItem: WorkItem;
+    workItem?: WorkItem;
+    id?: string | number;
 }>();
 
 const emit = defineEmits<{
@@ -14,7 +15,7 @@ const fullWorkItem = ref<WorkItem | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-const workItemData = computed(() => fullWorkItem.value || props.workItem);
+const workItemData = computed(() => fullWorkItem.value || props.workItem || null);
 
 const stateColor = computed(() => {
     const state = workItemData.value.state?.toLowerCase() || '';
@@ -78,11 +79,33 @@ const getInitials = (name: string | undefined) => {
 const loadDetails = async () => {
     loading.value = true;
     error.value = null;
+    fullWorkItem.value = null;
+
     try {
-        fullWorkItem.value = await workItemService.getWorkItemDetails(workItemData.value.id);
+        if (props.workItem) {
+            fullWorkItem.value = props.workItem;
+            const details = await workItemService.getWorkItemDetails(props.workItem.id);
+            fullWorkItem.value = details;
+            loading.value = false;
+            return;
+        }
+
+        if (props.id) {
+            const workItemId = Number(props.id);
+            if (isNaN(workItemId)) {
+                error.value = 'ID de Work Item inválido';
+                loading.value = false;
+                return;
+            }
+            fullWorkItem.value = await workItemService.getWorkItemDetails(workItemId);
+            loading.value = false;
+            return;
+        }
+
+        error.value = 'No se proporcionó un Work Item para mostrar';
+        loading.value = false;
     } catch (e: any) {
-        error.value = e?.message || 'Error al cargar los detalles del Work Item';
-    } finally {
+        error.value = e?.response?.data?.message || e?.message || 'Error al cargar los detalles del Work Item';
         loading.value = false;
     }
 };
@@ -90,6 +113,13 @@ const loadDetails = async () => {
 onMounted(() => {
     loadDetails();
 });
+
+watch(
+    () => [props.id, props.workItem],
+    () => {
+        loadDetails();
+    }
+);
 </script>
 
 <template>
@@ -110,16 +140,16 @@ onMounted(() => {
                 <span class="material-symbols-outlined text-[14px]" aria-hidden="true">chevron_right</span>
                 <span>Work Items</span>
                 <span class="material-symbols-outlined text-[14px]" aria-hidden="true">chevron_right</span>
-                <span class="text-primary font-semibold">#{{ workItem.id }}</span>
+                <span v-if="workItemData" class="text-primary font-semibold">#{{ workItemData.id }}</span>
             </nav>
         </div>
 
         <!-- Title Section -->
-        <div class="bg-surface-container-high border-b border-outline-variant px-4 md:px-6 py-4 shrink-0">
+        <div v-if="workItemData" class="bg-surface-container-high border-b border-outline-variant px-4 md:px-6 py-4 shrink-0">
             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
                     <h1 class="text-on-surface font-bold text-headline-lg leading-tight">
-                        {{ workItem.title }}
+                        {{ workItemData.title }}
                     </h1>
                     <div class="flex items-center gap-2.5 mt-4">
                         
@@ -128,11 +158,11 @@ onMounted(() => {
                             :class="stateColor"
                         >
                             <span class="w-1.5 h-1.5 rounded-full" :class="stateDotColor" aria-hidden="true"></span>
-                            {{ workItem.state }}
+                            {{ workItemData.state }}
                         </span>
                         <span class="flex items-center gap-1 text-on-surface-variant text-xs">
                             <span class="material-symbols-outlined text-[14px]" :class="typeColor" aria-hidden="true">{{ typeIcon }}</span>
-                            {{ workItem.type }}
+                            {{ workItemData.type }}
                         </span>
                     </div>
                     
@@ -140,9 +170,10 @@ onMounted(() => {
                 <div class="flex gap-3 shrink-0">      
                     <div class="relative">                        
                         <select
+                            v-if="workItemData"
                             id="work-item-state"
                             class="w-full bg-background border border-outline-variant rounded-lg p-2.5 text-on-surface font-body-sm text-body-sm appearance-none input-glow cursor-pointer pr-8"
-                            :value="workItem.state"
+                            :value="workItemData.state"
                         >
                             <option>New</option>
                             <option>To Do</option>
@@ -163,8 +194,15 @@ onMounted(() => {
             </div>
         </div>
 
+        <div v-if="error && !workItemData" class="flex-1 flex items-center justify-center">
+            <div class="text-center">
+                <p class="text-error mb-4">{{ error }}</p>
+                <button @click="emit('back')" class="px-4 py-2 bg-primary-container text-on-primary-container rounded-lg">Volver al dashboard</button>
+            </div>
+        </div>
+
         <!-- 2-Column Layout -->
-        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div v-else-if="workItemData" class="flex-1 flex flex-col lg:flex-row overflow-hidden">
             <!-- Left Column: Details & Content -->
             <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 flex flex-col gap-6 pb-8">
                 <!-- Description Section -->
