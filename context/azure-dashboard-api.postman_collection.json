@@ -1,0 +1,304 @@
+{
+  "info": {
+    "_postman_id": "b7f3c1a2-4d5e-4f6a-9b8c-1d2e3f4a5b6c",
+    "name": "Azure Dashboard API",
+    "description": "Colección de los endpoints actuales de la API (Laravel) del proyecto MonitoreoAzure. Importable en Postman o Bruno.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Obtener usuario autenticado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "user"
+              ]
+            },
+            "description": "Requiere token de Sanctum. Devuelve el usuario autenticado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Work Items",
+      "item": [
+        {
+          "name": "Listar Work Items activos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items?page=1&limit=10&assigned_to=@Me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Elementos por página (default: 10)"
+                },
+                {
+                  "key": "assigned_to",
+                  "value": "@Me",
+                  "description": "Filtro de asignado (default: @Me)"
+                }
+              ]
+            },
+            "description": "Devuelve los Work Items activos con paginación y resumen por estado."
+          },
+          "response": []
+        },
+        {
+          "name": "Enlazar rama a Work Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"repository_id\": \"{{repositoryId}}\",\n  \"branch_name\": \"feature/mi-rama\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/link-branch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "link-branch"
+              ]
+            },
+            "description": "Enlaza una rama de un repositorio a un Work Item. Requiere repository_id y branch_name."
+          },
+          "response": []
+        },
+        {
+          "name": "Enlazar Pull Request a Work Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"artifact_id\": \"{{artifactId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/work-items/{{workItemId}}/link-pr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-items",
+                "{{workItemId}}",
+                "link-pr"
+              ]
+            },
+            "description": "Enlaza una Pull Request a un Work Item. Requiere artifact_id (formato vstfs:///Git/PullRequestId/...)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Agentes",
+      "item": [
+        {
+          "name": "Listar agentes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agents"
+              ]
+            },
+            "description": "Devuelve el estado de los agentes de Azure DevOps."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Repositorios",
+      "item": [
+        {
+          "name": "Listar repositorios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/repositories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repositories"
+              ]
+            },
+            "description": "Devuelve los repositorios del proyecto de Azure DevOps."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar ramas de un repositorio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/repositories/{{repositoryId}}/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repositories",
+                "{{repositoryId}}",
+                "branches"
+              ]
+            },
+            "description": "Devuelve las ramas del repositorio indicado por repositoryId."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Pull Requests activos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/repositories/{{repositoryId}}/pull-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "repositories",
+                "{{repositoryId}}",
+                "pull-requests"
+              ]
+            },
+            "description": "Devuelve las Pull Requests activas del repositorio indicado por repositoryId."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8001",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "workItemId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "repositoryId",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "artifactId",
+      "value": "vstfs:///Git/PullRequestId/00000000-0000-0000-0000-000000000000%2F00000000-0000-0000-0000-000000000000%2F1",
+      "type": "string"
+    }
+  ]
+}

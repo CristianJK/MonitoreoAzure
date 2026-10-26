@@ -102,7 +102,7 @@ protected $client;
 
     private function buildActiveWorkItemsQuery($assignedTo)
     {
-        $query = "Select [System.Id], [System.Title], [System.State] 
+        $query = "Select [System.Id], [System.Title], [System.State], [System.Description]
                   From WorkItems 
                   Where [System.State] <> 'Closed'";
 
@@ -146,6 +146,108 @@ protected $client;
         $response = $this->client->get("wit/workitems?ids={$idsString}&api-version=7.1");
         
         return json_decode($response->getBody()->getContents(), true)['value'] ?? [];
+    }
+
+    
+    public function getWorkItemById($workItemId)
+    {
+        try {
+            $response = $this->client->get("wit/workitems/{$workItemId}", [
+                'query' => [
+                    '$expand'     => 'all',
+                    'api-version' => '7.1',
+                ]
+            ]);
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            $errorDetail = $e->getMessage();
+            if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
+                $errorDetail = $e->getResponse()->getBody()->getContents();
+            }
+            return ['error' => "Error al obtener el Work Item: {$errorDetail}"];
+        }
+    }
+
+    public function getWorkItemComments($workItemId)
+    {
+        try {
+            $response = $this->client->get("wit/workItems/{$workItemId}/comments?api-version=7.1-preview.3");
+            $result = json_decode($response->getBody()->getContents(), true);
+            return $result['comments'] ?? [];
+        } catch (\Exception $e) {
+            // Intentar sin preview si falla
+            try {
+                $response = $this->client->get("wit/workItems/{$workItemId}/comments?api-version=7.1");
+                $result = json_decode($response->getBody()->getContents(), true);
+                return $result['comments'] ?? [];
+            } catch (\Exception $e2) {
+                return [];
+            }
+        }
+    }
+
+    public function getWorkItemUpdates($workItemId)
+    {
+        try {
+            $response = $this->client->get("wit/workItems/{$workItemId}/updates?api-version=7.1");
+            $result = json_decode($response->getBody()->getContents(), true);
+            return $result['value'] ?? [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function getWorkItemFullDetails($workItemId)
+    {
+        try {
+            $workItem = $this->getWorkItemById($workItemId);
+            if (isset($workItem['error'])) {
+                return $workItem;
+            }
+
+            $comments = $this->getWorkItemComments($workItemId);
+            $updates = $this->getWorkItemUpdates($workItemId);
+
+            $fields = $workItem['fields'] ?? [];
+
+            $history = [];
+            foreach ($updates as $update) {
+                $fieldsUpdate = $update['fields'] ?? [];
+                if (!empty($fieldsUpdate)) {
+                    $history[] = [
+                        'id' => $update['id'] ?? null,
+                        'revisedBy' => $update['revisedBy'] ?? null,
+                        'revisedDate' => $update['revisedDate'] ?? null,
+                        'fields' => $fieldsUpdate,
+                    ];
+                }
+            }
+
+            return [
+                'id' => $workItem['id'],
+                'title' => $fields['System.Title'] ?? 'Sin título',
+                'state' => $fields['System.State'] ?? 'Desconocido',
+                'type' => $fields['System.WorkItemType'] ?? '',
+                'assigned_to' => $fields['System.AssignedTo']['displayName'] ?? 'Sin asignar',
+                'assigned_to_obj' => $fields['System.AssignedTo'] ?? null,
+                'description' => $fields['System.Description'] ?? '',
+                'created_by' => $fields['System.CreatedBy'] ?? null,
+                'created_date' => $fields['System.CreatedDate'] ?? null,
+                'changed_by' => $fields['System.ChangedBy'] ?? null,
+                'changed_date' => $fields['System.ChangedDate'] ?? null,
+                'area_path' => $fields['System.AreaPath'] ?? null,
+                'iteration_path' => $fields['System.IterationPath'] ?? null,
+                'comments' => $comments,
+                'history' => $history,
+                'relations' => $workItem['relations'] ?? [],
+            ];
+        } catch (\Exception $e) {
+            $errorDetail = $e->getMessage();
+            if (method_exists($e, 'getResponse') && $e->getResponse() !== null) {
+                $errorDetail = $e->getResponse()->getBody()->getContents();
+            }
+            return ['error' => "Error al obtener detalles completos: {$errorDetail}"];
+        }
     }
 
     public function linkBranchToWorkItem($workItemId, $repositoryId, $branchName)

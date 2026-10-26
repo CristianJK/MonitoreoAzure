@@ -11,6 +11,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::get('/work-items', [AzureWorkItemController::class, 'index']);
+Route::get('/work-items/{id}', [AzureWorkItemController::class, 'show']);
 Route::post('/work-items/{id}/link-branch', [AzureWorkItemController::class, 'linkBranch']);
 Route::post('/work-items/{id}/link-pr', [AzureWorkItemController::class, 'linkPullRequest']);
 

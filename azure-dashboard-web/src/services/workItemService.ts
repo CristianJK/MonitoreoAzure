@@ -6,6 +6,17 @@ export interface WorkItem {
     state: string;
     type: string;
     assigned_to: string;
+    assigned_to_obj?: any;
+    description?: string;
+    created_by?: any;
+    created_date?: string;
+    changed_by?: any;
+    changed_date?: string;
+    area_path?: string;
+    iteration_path?: string;
+    comments?: any[];
+    history?: any[];
+    relations?: any[];
 }
 
 export interface PaginatedWorkItems<T = WorkItem> {
@@ -30,5 +41,10 @@ export const workItemService = {
             }
         });
         return response.data;
+    },
+
+    async getWorkItemDetails(id: number): Promise<WorkItem> {
+        const response = await apiClient.get<{ data: WorkItem }>(`/work-items/${id}`);
+        return response.data.data;
     }
 };

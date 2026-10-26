@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { WorkItem } from '@/services/workItemService';
+import { computed, onMounted, ref } from 'vue';
+import { workItemService, type WorkItem } from '@/services/workItemService';
 
 const props = defineProps<{
     workItem: WorkItem;
@@ -10,34 +10,85 @@ const emit = defineEmits<{
     back: [];
 }>();
 
+const fullWorkItem = ref<WorkItem | null>(null);
+const loading = ref(false);
+const error = ref<string | null>(null);
+
+const workItemData = computed(() => fullWorkItem.value || props.workItem);
+
 const stateColor = computed(() => {
-    const state = props.workItem.state?.toLowerCase() || '';
-    if (state === 'done') return 'bg-success/20 text-success border-success/30';
+    const state = workItemData.value.state?.toLowerCase() || '';
+    if (state === 'done' || state === 'closed') return 'bg-success/20 text-success border-success/30';
     if (state === 'in progress') return 'bg-primary-container/20 text-primary border-primary/30';
-    if (state === 'to do') return 'bg-secondary/20 text-secondary border-secondary/30';
+    if (state === 'to do' || state === 'new') return 'bg-secondary/20 text-secondary border-secondary/30';
     return 'bg-surface-variant text-on-surface-variant border-outline-variant';
 });
 
 const stateDotColor = computed(() => {
-    const state = props.workItem.state?.toLowerCase() || '';
-    if (state === 'done') return 'bg-success';
+    const state = workItemData.value.state?.toLowerCase() || '';
+    if (state === 'done' || state === 'closed') return 'bg-success';
     if (state === 'in progress') return 'bg-primary';
-    if (state === 'to do') return 'bg-secondary';
+    if (state === 'to do' || state === 'new') return 'bg-secondary';
     return 'bg-on-surface-variant';
 });
 
 const typeIcon = computed(() => {
-    const type = props.workItem.type?.toLowerCase() || '';
+    const type = workItemData.value.type?.toLowerCase() || '';
     if (type.includes('bug')) return 'bug_report';
     if (type.includes('product')) return 'inventory_2';
     return 'task';
 });
 
 const typeColor = computed(() => {
-    const type = props.workItem.type?.toLowerCase() || '';
+    const type = workItemData.value.type?.toLowerCase() || '';
     if (type.includes('bug')) return 'text-error';
     if (type.includes('product')) return 'text-secondary';
     return 'text-primary';
+});
+
+const commentsCount = computed(() => {
+    return (workItemData.value.comments?.length || 0) + (workItemData.value.history?.length || 0);
+});
+
+const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '';
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleString('es-ES', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return dateString;
+    }
+};
+
+const getInitials = (name: string | undefined) => {
+    if (!name) return '?';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+};
+
+const loadDetails = async () => {
+    loading.value = true;
+    error.value = null;
+    try {
+        fullWorkItem.value = await workItemService.getWorkItemDetails(workItemData.value.id);
+    } catch (e: any) {
+        error.value = e?.message || 'Error al cargar los detalles del Work Item';
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(() => {
+    loadDetails();
 });
 </script>
 
@@ -125,79 +176,68 @@ const typeColor = computed(() => {
                         class="p-4 font-body-md text-body-md text-on-surface leading-relaxed min-h-[180px] outline-none"                        
                         aria-label="Description content"
                     >
-                        <p class="mb-3">Implementar la lógica de generación de PINs versión 3.0 para el módulo ARQ-VTA.</p>
-                        <p class="mb-3">Requisitos:</p>
-                        <ul class="list-disc pl-5 mb-3 space-y-1.5 text-on-surface-variant">
-                            <li>Actualizar el generador de números aleatorios criptográficamente seguro (CSPRNG).</li>
-                            <li>Garantizar compatibilidad retroactiva con APIs V2 durante la fase de transición.</li>
-                            <li>Agregar pruebas unitarias comprehensivas para casos extremos (ej: secuencias repetidas).</li>
-                            <li>Registrar eventos de generación de forma segura (excluir el PIN real de los logs).</li>
-                        </ul>
-                        <p>Documento de referencia arquitectónica: <a class="text-primary hover:underline" href="#">VTA-Security-Specs-v3.pdf</a></p>
+                        <div v-if="loading" class="text-on-surface-variant text-sm">Cargando descripción...</div>
+                        <div v-else-if="error" class="text-error text-sm">{{ error }}</div>
+                        <div v-else-if="workItemData.description && workItemData.description.trim()" v-html="workItemData.description" class="prose prose-sm max-w-none text-on-surface"></div>
+                        <p v-else class="text-on-surface-variant italic">Sin descripción</p>
                     </div>
                 </section>
 
                 <!-- Discussion Section -->
                 <section class="flex flex-col gap-4">
                     <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-                        <h2 class="font-headline-sm text-headline-sm text-on-surface">Discussion</h2>
-                        <span class="bg-surface-variant text-on-surface-variant px-2.5 py-0.5 rounded-full font-label-mono text-[10px]">3 Comments</span>
+                        <h2 class="font-headline-sm text-headline-sm text-on-surface">Discussion / History</h2>
+                        <span class="bg-surface-variant text-on-surface-variant px-2.5 py-0.5 rounded-full font-label-mono text-[10px]">{{ commentsCount }} elementos</span>
                     </div>
 
                     <!-- Comment Feed -->
                     <div class="flex flex-col gap-4">
-                        <!-- Comment 1 -->
-                        <div class="flex gap-3">
-                            <div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container text-xs font-bold shrink-0 border border-outline-variant">
-                                SC
-                            </div>
-                            <div class="flex-1 bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
-                                <div class="px-4 py-2.5 border-b border-outline-variant flex justify-between items-center bg-surface-variant">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-body-sm text-body-sm font-semibold text-on-surface">Sarah Chen</span>
-                                        <span class="text-on-surface-variant text-[11px]">hace 1 día a las 14:32</span>
+                        <!-- Comments -->
+                        <template v-if="workItemData.comments && workItemData.comments.length > 0">
+                            <div v-for="comment in workItemData.comments" :key="comment.id" class="flex gap-3">
+                                <div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container text-xs font-bold shrink-0 border border-outline-variant">
+                                    {{ getInitials(comment.createdBy?.displayName) }}
+                                </div>
+                                <div class="flex-1 bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
+                                    <div class="px-4 py-2.5 border-b border-outline-variant flex justify-between items-center bg-surface-variant">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-body-sm text-body-sm font-semibold text-on-surface">{{ comment.createdBy?.displayName || 'Usuario' }}</span>
+                                            <span class="text-on-surface-variant text-[11px]">{{ formatDate(comment.createdDate) }}</span>
+                                        </div>
                                     </div>
-                                    <button class="text-on-surface-variant hover:text-primary p-1 rounded transition-colors" aria-label="Edit comment">
-                                        <span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
-                                    </button>
-                                </div>
-                                <div class="p-4 font-body-sm text-body-sm text-on-surface leading-relaxed">
-                                    He revisado las especificaciones V3. El requisito de registro necesita aclaración respecto al cumplimiento de GDPR. Etiquetaré al equipo legal en el PR.
+                                    <div class="p-4 font-body-sm text-body-sm text-on-surface leading-relaxed" v-html="comment.text"></div>
                                 </div>
                             </div>
-                        </div>
+                        </template>
 
-                        <!-- System Action -->
-                        <div class="flex items-center gap-2 pl-11 py-1">
-                            <span class="material-symbols-outlined text-[14px] text-on-surface-variant" aria-hidden="true">change_circle</span>
-                            <span class="font-body-sm text-body-sm text-on-surface-variant">
-                                <strong class="text-on-surface">David Miller</strong> cambió estado de
-                                <span class="line-through">To Do</span> a
-                                <strong class="text-primary">In Progress</strong>
-                                <span class="text-[11px] ml-1.5">hoy a las 09:15</span>
-                            </span>
-                        </div>
-
-                        <!-- Comment 2 -->
-                        <div class="flex gap-3">
-                            <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container text-xs font-bold shrink-0">
-                                DM
-                            </div>
-                            <div class="flex-1 bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
-                                <div class="px-4 py-2.5 border-b border-outline-variant flex justify-between items-center bg-surface-variant">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-body-sm text-body-sm font-semibold text-primary">David Miller</span>
-                                        <span class="text-on-surface-variant text-[11px]">hoy a las 09:45</span>
+                        <!-- History / System Actions -->
+                        <template v-if="workItemData.history && workItemData.history.length > 0">
+                            <div v-for="update in workItemData.history" :key="update.id" class="flex items-center gap-2 pl-11 py-1">
+                                <span class="material-symbols-outlined text-[14px] text-on-surface-variant" aria-hidden="true">change_circle</span>
+                                <span class="font-body-sm text-body-sm text-on-surface-variant">
+                                    <strong class="text-on-surface">{{ update.revisedBy?.displayName || 'Sistema' }}</strong>
+                                    <span class="ml-1">{{ formatDate(update.revisedDate) }}</span>
+                                    <div class="mt-1 text-xs">
+                                        <template v-for="(fieldData, fieldName) in update.fields" :key="fieldName">
+                                            <div v-if="fieldName === 'System.State' && fieldData.oldValue && fieldData.newValue" class="mt-0.5">
+                                                cambió estado de <span class="line-through">{{ fieldData.oldValue }}</span> a <strong class="text-primary">{{ fieldData.newValue }}</strong>
+                                            </div>
+                                            <div v-else-if="fieldName === 'System.AssignedTo' && fieldData.newValue" class="mt-0.5">
+                                                asignó a <strong class="text-on-surface">{{ fieldData.newValue.displayName || fieldData.newValue }}</strong>
+                                                <span v-if="fieldData.oldValue"> (anterior: {{ fieldData.oldValue.displayName || fieldData.oldValue }})</span>
+                                            </div>
+                                            <div v-else-if="fieldName === 'System.Title' && fieldData.newValue" class="mt-0.5">
+                                                actualizó el título
+                                            </div>
+                                        </template>
                                     </div>
-                                    <button class="text-on-surface-variant hover:text-primary p-1 rounded transition-colors" aria-label="Edit comment">
-                                        <span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
-                                    </button>
-                                </div>
-                                <div class="p-4 font-body-sm text-body-sm text-on-surface leading-relaxed">
-                                    @Sarah Buen punto. He iniciado la implementación de la actualización del CSPRNG. La rama es <code class="px-1.5 py-0.5 bg-surface-variant rounded text-primary text-xs">feature/arq-vta-pin-v3</code>.
-                                </div>
+                                </span>
                             </div>
-                        </div>
+                        </template>
+
+                        <p v-if="(!workItemData.comments || workItemData.comments.length === 0) && (!workItemData.history || workItemData.history.length === 0)" class="text-on-surface-variant italic text-sm pl-2">
+                            Sin comentarios ni historial
+                        </p>
                     </div>
 
                     <!-- Add Comment Area -->
@@ -239,6 +279,39 @@ const typeColor = computed(() => {
 
             <!-- Right Column: Metadata / Sidebar -->
             <aside class="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-outline-variant bg-surface-container-highest overflow-y-auto custom-scrollbar flex flex-col shrink-0">
+                <!-- Work Item Info -->
+                <div class="p-4 border-b border-outline-variant bg-surface-container-high">
+                    <h3 class="font-label-caps text-label-caps text-primary font-bold mb-3 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">info</span>
+                        Información
+                    </h3>
+                    <div class="flex flex-col gap-2 text-xs">
+                        <div v-if="workItemData.created_by" class="flex flex-col">
+                            <span class="text-on-surface-variant">Creado por</span>
+                            <span class="text-on-surface">{{ workItemData.created_by.displayName }}</span>
+                        </div>
+                        <div v-if="workItemData.created_date" class="flex flex-col">
+                            <span class="text-on-surface-variant">Creado</span>
+                            <span class="text-on-surface">{{ formatDate(workItemData.created_date) }}</span>
+                        </div>
+                        <div v-if="workItemData.changed_by" class="flex flex-col">
+                            <span class="text-on-surface-variant">Actualizado por</span>
+                            <span class="text-on-surface">{{ workItemData.changed_by.displayName }}</span>
+                        </div>
+                        <div v-if="workItemData.changed_date" class="flex flex-col">
+                            <span class="text-on-surface-variant">Actualizado</span>
+                            <span class="text-on-surface">{{ formatDate(workItemData.changed_date) }}</span>
+                        </div>
+                        <div v-if="workItemData.area_path" class="flex flex-col">
+                            <span class="text-on-surface-variant">Area Path</span>
+                            <span class="text-on-surface truncate" :title="workItemData.area_path">{{ workItemData.area_path }}</span>
+                        </div>
+                        <div v-if="workItemData.iteration_path" class="flex flex-col">
+                            <span class="text-on-surface-variant">Iteration Path</span>
+                            <span class="text-on-surface truncate" :title="workItemData.iteration_path">{{ workItemData.iteration_path }}</span>
+                        </div>
+                    </div>
+                </div>
                 <!-- Production Readiness Checklist -->
                 <div class="flex-1 p-4 border-b border-outline-variant bg-surface-container-high relative overflow-hidden">
                     <div class="absolute top-0 left-0 w-1 h-full bg-primary" aria-hidden="true"></div>
@@ -368,16 +441,15 @@ const typeColor = computed(() => {
                     </div>
                 </div>
                 <!-- System Info -->
-                <div class="mt-auto p-4 border-t border-outline-variant text-on-surface-variant font-label-mono text-[10px] space-y-1 opacity-60">
-                    <p>Creado por System Admin el Oct 24, 2023</p>
-                    <p>Actualizado por David Miller hace 2 hrs</p>
+                <div class="mt-auto p-4 border-t border-outline-variant text-on-surface-variant font-label-mono text-[10px] space-y-2">
                     <label class="font-label-mono text-label-mono text-on-surface-variant text-xs" for="work-item-assignee">Assigned To</label>
-                    <div class="flex items-center gap-2.5 p-2.5">
-                        <div class="w-6 h-6 rounded-full bg-surface-bright flex items-center justify-center text-[10px] font-bold text-on-surface border border-outline-variant">
-                            {{ workItem.assigned_to?.charAt(0) || '?' }}
+                    <div class="flex items-center gap-2.5 p-2.5 bg-surface-variant rounded-lg">
+                        <div class="w-6 h-6 rounded-full bg-primary-container flex items-center justify-center text-[10px] font-bold text-on-primary-container border border-outline-variant">
+                            {{ getInitials(workItemData.assigned_to) }}
                         </div>
-                        <span class="font-body-sm text-body-sm text-on-surface flex-1 truncate">{{ workItem.assigned_to }}</span>
+                        <span class="font-body-sm text-body-sm text-on-surface flex-1 truncate">{{ workItemData.assigned_to }}</span>
                     </div>
+                    <p v-if="workItemData.changed_date" class="opacity-60">Actualizado: {{ formatDate(workItemData.changed_date) }}</p>
                 </div>
             </aside>
         </div>

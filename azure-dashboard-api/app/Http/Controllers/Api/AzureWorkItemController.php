@@ -50,6 +50,17 @@ class AzureWorkItemController extends Controller
         ]);
     }
 
+    public function show($id): JsonResponse
+    {
+        $result = $this->azureDevOpsService->getWorkItemFullDetails($id);
+        
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], 500);
+        }
+
+        return response()->json(['data' => $result]);
+    }
+
     public function linkBranch(Request $request, $id): JsonResponse
     {
         // Validamos que el frontend envíe los datos necesarios
