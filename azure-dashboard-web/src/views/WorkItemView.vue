@@ -56,6 +56,9 @@ watch(workItemId, () => {
     loadDetails();
 }, { immediate: true });
 
+// Solo el responsable del WI puede modificarlo; para el resto la vista es de solo lectura
+const canEdit = computed(() => !!workItemData.value?.permissions?.can_edit);
+
 const commentsCount = computed(() =>
     (workItemData.value?.comments?.length || 0) + (workItemData.value?.history?.length || 0));
 
@@ -233,7 +236,7 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                         </span>
                     </div>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-3 shrink-0">
+                <div v-if="canEdit" class="flex flex-col sm:flex-row gap-3 shrink-0">
                     <div>
                         <label for="work-item-state" class="sr-only">Estado del Work Item</label>
                         <div class="relative">
@@ -265,6 +268,13 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                     </button>
                 </div>
             </div>
+            <p v-if="!canEdit" class="mt-3 flex items-center gap-2 text-body-sm text-on-surface-variant bg-surface-container border border-outline-variant rounded-lg px-3 py-2">
+                <span class="material-symbols-outlined text-[18px] text-warning" aria-hidden="true">visibility</span>
+                <span>
+                    <strong class="text-on-surface">Solo lectura</strong> — asignado a {{ workItemData.assigned_to }}.
+                    Solo puedes modificar los work items asignados a ti.
+                </span>
+            </p>
         </div>
 
         <div v-if="loading && !workItemData" class="flex-1 flex items-center justify-center text-on-surface-variant p-10">
@@ -305,7 +315,7 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                     </div>
 
                     <!-- Add Comment Area -->
-                    <form class="flex gap-3" @submit.prevent="addComment">
+                    <form v-if="canEdit" class="flex gap-3" @submit.prevent="addComment">
                         <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container text-xs font-bold shrink-0" aria-hidden="true">
                             {{ initials(currentUser?.displayName) }}
                         </div>
@@ -460,7 +470,7 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                 </div>
 
                 <!-- Alistamiento -->
-                <WorkItemChecklist :work-item-id="workItemData.id" :state="workItemData.state" @loaded="checklist = $event" />
+                <WorkItemChecklist :work-item-id="workItemData.id" :state="workItemData.state" :readonly="!canEdit" @loaded="checklist = $event" />
             </aside>
         </div>
 

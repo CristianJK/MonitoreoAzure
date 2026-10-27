@@ -9,6 +9,8 @@ const props = defineProps<{
     workItemId: number;
     // Cambia cuando el WI cambia de estado, para recargar el alistamiento
     state?: string;
+    // WI de otra persona: se muestra el avance pero no se registran valores
+    readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -161,8 +163,9 @@ defineExpose({ reload: load });
                                 <span class="material-symbols-outlined text-[18px] shrink-0 mt-px" :class="statusIcon(item).class" aria-hidden="true">{{ statusIcon(item).icon }}</span>
                                 <button
                                     type="button"
-                                    class="flex-1 min-w-0 text-left rounded focus-visible:outline-2"
-                                    :aria-label="`${item.label}: ${displayValue(item)}. Abrir para registrar valor`"
+                                    class="flex-1 min-w-0 text-left rounded focus-visible:outline-2 disabled:cursor-default"
+                                    :aria-label="readonly ? `${item.label}: ${displayValue(item)}` : `${item.label}: ${displayValue(item)}. Abrir para registrar valor`"
+                                    :disabled="readonly"
                                     @click="selected = item"
                                 >
                                     <span class="flex items-center gap-1.5 text-body-sm font-semibold text-on-surface leading-tight">

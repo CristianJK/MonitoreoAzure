@@ -8,7 +8,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | `org` acepta el nombre de la organización o la URL completa
-    | (https://dev.azure.com/mi-org). El PAT necesita los scopes: Work Items
+    | (https://dev.azure.com/mi-org). No hay PAT global: cada usuario inicia
+    | sesión con su PAT personal, que se usa en sus peticiones y en sus jobs
+    | (agente en lote y programado). Scopes necesarios: Work Items
     | (Read & Write), Code (Read), Build (Read), Agent Pools (Read) y
     | Project and Team (Read).
     |
@@ -18,8 +20,12 @@ return [
 
     'project' => env('AZURE_DEVOPS_PROJECT'),
 
-    'pat' => env('AZURE_DEVOPS_PAT'),
-
     'timeout' => (int) env('AZURE_DEVOPS_TIMEOUT', 30),
+
+    // Correos con permiso para administrar el catálogo de alistamiento
+    'admins' => array_values(array_filter(array_map(
+        fn ($email) => strtolower(trim($email)),
+        explode(',', (string) env('AUTH_ADMINS', '')),
+    ))),
 
 ];

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AgentRun extends Model
 {
     protected $fillable = [
+        'user_id',
         'azure_work_item_id',
         'run_date',
         'trigger',

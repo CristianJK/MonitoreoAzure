@@ -2,15 +2,26 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class WorkItemCommentAndStateTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAsAzureUser();
+    }
+
     public function test_adds_comment_as_html(): void
     {
         Http::fake([
+            '*/_apis/wit/workitems/10*' => Http::response($this->workItemResponse(10)),
             '*/_apis/wit/workItems/10/comments*' => Http::response([
                 'id' => 99, 'text' => '<p>x</p>', 'createdBy' => ['displayName' => 'Ana'], 'createdDate' => '2026-10-26T10:00:00Z',
             ]),
@@ -50,6 +61,7 @@ class WorkItemCommentAndStateTest extends TestCase
         $this->getJson('/api/work-items/10')
             ->assertOk()
             ->assertJsonCount(2, 'data.pull_requests')
+            ->assertJsonPath('data.permissions.can_edit', true)
             ->assertJsonPath('data.pull_requests.0.id', 700)
             ->assertJsonPath('data.pull_requests.0.isDraft', true)
             ->assertJsonPath('data.pull_requests.0.sourceBranch', 'feature/login')
@@ -60,6 +72,8 @@ class WorkItemCommentAndStateTest extends TestCase
 
     public function test_comment_text_is_required(): void
     {
+        Http::fake(['*/_apis/wit/workitems/10*' => Http::response($this->workItemResponse(10))]);
+
         $this->postJson('/api/work-items/10/comments', ['text' => ''])->assertUnprocessable();
     }
 
@@ -81,7 +95,10 @@ class WorkItemCommentAndStateTest extends TestCase
 
     public function test_rejects_state_not_valid_for_type(): void
     {
-        Http::fake($this->fakeWorkItemTypes());
+        Http::fake([
+            ...$this->fakeWorkItemTypes(),
+            '*/_apis/wit/workitems/10*' => Http::response($this->workItemResponse(10)),
+        ]);
 
         $this->patchJson('/api/work-items/10/state', ['state' => 'Committed', 'type' => 'Task'])
             ->assertUnprocessable()
@@ -94,7 +111,9 @@ class WorkItemCommentAndStateTest extends TestCase
     {
         Http::fake([
             ...$this->fakeWorkItemTypes(),
-            '*/_apis/wit/workitems/10*' => Http::response(['message' => 'TF401320: Rule Error for field Remaining Work'], 400),
+            '*/_apis/wit/workitems/10*' => Http::sequence()
+                ->push($this->workItemResponse(10))
+                ->push(['message' => 'TF401320: Rule Error for field Remaining Work'], 400),
         ]);
 
         $this->patchJson('/api/work-items/10/state', ['state' => 'Done', 'type' => 'Task'])
@@ -115,7 +134,8 @@ class WorkItemCommentAndStateTest extends TestCase
             ->assertOk()
             ->assertJsonPath('total', 3)
             ->assertJsonPath('totalPages', 2)
-            ->assertJsonPath('data.0.assigned_to', 'Ana');
+            ->assertJsonPath('data.0.assigned_to', 'Ana')
+            ->assertJsonPath('data.0.is_mine', false);
 
         Http::assertSent(fn (Request $request) => str_contains($request->url(), '/wit/workitems?')
             && str_contains(urldecode($request->url()), 'ids=3'));

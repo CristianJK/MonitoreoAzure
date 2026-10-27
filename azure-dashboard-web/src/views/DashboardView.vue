@@ -191,7 +191,7 @@ const startingBatch = ref(false);
 const startBatch = async () => {
     startingBatch.value = true;
     try {
-        const { batch_id, count } = await agentService.startBatch(filters.value.assignedTo);
+        const { batch_id, count } = await agentService.startBatch();
         confirmBatch.value = false;
         if (!count) {
             toast.info('No hay Work Items abiertos para analizar.');
@@ -271,6 +271,14 @@ const checklistBadge = (id: number) => {
                     <h2 class="text-headline-sm font-headline-sm text-on-surface">
                         Work Items
                         <span v-if="isOtherUser" class="text-body-sm font-normal text-on-surface-variant">de {{ assignedLabel || assignedTo }}</span>
+                        <span
+                            v-if="isOtherUser"
+                            class="ml-2 inline-flex items-center gap-1 align-middle text-[11px] font-normal text-warning border border-warning/40 rounded px-1.5 py-px"
+                            title="Solo puedes modificar los work items asignados a ti"
+                        >
+                            <span class="material-symbols-outlined text-[13px]" aria-hidden="true">visibility</span>
+                            Solo lectura
+                        </span>
                     </h2>
                     <div class="flex flex-wrap gap-2">
                         <button
@@ -284,7 +292,7 @@ const checklistBadge = (id: number) => {
                             Filtros
                             <span v-if="activeFilterCount" class="bg-primary-container text-on-primary-container text-[11px] font-bold rounded-full w-5 h-5 flex items-center justify-center">{{ activeFilterCount }}</span>
                         </button>
-                        <button type="button" class="btn btn-outline btn-sm group" @click="confirmBatch = true">
+                        <button v-if="!isOtherUser" type="button" class="btn btn-outline btn-sm group" @click="confirmBatch = true">
                             <span class="material-symbols-outlined text-[16px] group-hover:animate-spin-slow" aria-hidden="true">auto_awesome</span>
                             Daily Comment Automation
                         </button>
@@ -411,6 +419,7 @@ const checklistBadge = (id: number) => {
 
                         <div class="md:col-span-1 flex justify-end row-span-2 md:row-span-1">
                             <button
+                                v-if="item.is_mine"
                                 type="button"
                                 class="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-bright transition-colors"
                                 title="Vincular Pull Request"
@@ -451,8 +460,7 @@ const checklistBadge = (id: number) => {
             @cancel="confirmBatch = false"
         >
             <p>
-                Se revisarán los Work Items abiertos de
-                <strong class="text-on-surface">{{ isOtherUser ? (assignedLabel || assignedTo) : 'Yo (@Me)' }}</strong>
+                Se revisarán <strong class="text-on-surface">tus</strong> Work Items abiertos
                 buscando commits de hoy en sus Pull Requests o ramas.
             </p>
             <p>Copilot redactará una propuesta para los que tengan commits. Todas quedan en la bandeja para revisión: nada se publica automáticamente.</p>

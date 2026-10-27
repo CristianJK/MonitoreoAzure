@@ -23,6 +23,8 @@ class AgentCommentTest extends TestCase
 
         // 26/10/2026 15:00 en Bogotá
         Carbon::setTestNow(Carbon::parse('2026-10-26 20:00:00', 'UTC'));
+
+        $this->actingAsAzureUser();
     }
 
     protected function fakeAzure(array $commits): void
@@ -42,7 +44,6 @@ class AgentCommentTest extends TestCase
                 ['item' => ['path' => '/src', 'gitObjectType' => 'tree']],
             ]]),
             '*/_apis/wit/workItems/50/comments*' => Http::response(['id' => 555, 'text' => '<p>ok</p>']),
-            '*/_apis/connectionData*' => Http::response(['authenticatedUser' => ['providerDisplayName' => 'Ana']]),
         ]);
     }
 

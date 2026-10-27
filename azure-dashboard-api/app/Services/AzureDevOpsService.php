@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
@@ -15,6 +16,10 @@ use Illuminate\Support\Str;
  *
  * Convención: los métodos públicos no lanzan excepciones; ante un error
  * devuelven ['error' => mensaje, 'status' => código HTTP de Azure].
+ *
+ * Credencial: el PAT personal del usuario. El contenedor entrega forUser()
+ * con el usuario de la sesión (o con el usuario de User::actAs() en los
+ * jobs), así Azure aplica sus permisos y los comentarios quedan a su nombre.
  */
 class AzureDevOpsService
 {
@@ -26,7 +31,10 @@ class AzureDevOpsService
 
     protected string $project;
 
-    protected string $pat;
+    protected ?string $pat = null;
+
+    // Separa en cache los resultados que dependen de quién consulta (@Me)
+    protected string $cacheScope = 'anonymous';
 
     public function __construct()
     {
@@ -39,7 +47,20 @@ class AzureDevOpsService
         }
 
         $this->project = (string) config('azure.project');
-        $this->pat = (string) config('azure.pat');
+    }
+
+    public function forUser(User $user): static
+    {
+        return $this->withPat((string) $user->azure_pat, 'user.'.$user->id);
+    }
+
+    public function withPat(string $pat, string $cacheScope = 'pat'): static
+    {
+        $service = clone $this;
+        $service->pat = $pat;
+        $service->cacheScope = $cacheScope;
+
+        return $service;
     }
 
     /**
@@ -60,6 +81,10 @@ class AzureDevOpsService
 
     protected function request(string $baseUrl, string $apiVersion): PendingRequest
     {
+        if (! $this->pat) {
+            throw new \RuntimeException('No hay un PAT de Azure DevOps para esta petición');
+        }
+
         return Http::baseUrl($baseUrl)
             ->withBasicAuth('', $this->pat)
             ->acceptJson()
@@ -108,7 +133,7 @@ class AzureDevOpsService
 
             $summaryFilters = $filters;
             unset($summaryFilters['states']);
-            $summary = Cache::remember('azure.summary.'.md5(json_encode($summaryFilters)), 60, fn () => [
+            $summary = Cache::remember('azure.summary.'.md5(json_encode([$this->cacheScope, $summaryFilters])), 60, fn () => [
                 'done' => count($this->runWiql($this->buildWorkItemsQuery([...$summaryFilters, 'states' => ['Done']]))),
                 'inProgress' => count($this->runWiql($this->buildWorkItemsQuery([...$summaryFilters, 'states' => ['In Progress']]))),
                 'toDo' => count($this->runWiql($this->buildWorkItemsQuery([...$summaryFilters, 'states' => ['To Do']]))),
@@ -197,6 +222,24 @@ class AzureDevOpsService
             return $this->client()->get("wit/workitems/{$workItemId}", ['$expand' => 'all'])->json();
         } catch (\Throwable $e) {
             return $this->formatError($e, 'Error al obtener el Work Item');
+        }
+    }
+
+    /**
+     * Identidad asignada al work item (null si no tiene) para validar permisos.
+     *
+     * @return array{assignee: ?array}|array{error: string, status: int}
+     */
+    public function getWorkItemAssignee(int $workItemId): array
+    {
+        try {
+            $fields = $this->client()
+                ->get("wit/workitems/{$workItemId}", ['fields' => 'System.AssignedTo'])
+                ->json('fields') ?? [];
+
+            return ['assignee' => $fields['System.AssignedTo'] ?? null];
+        } catch (\Throwable $e) {
+            return $this->formatError($e, 'Error al consultar el responsable del Work Item');
         }
     }
 
@@ -447,23 +490,53 @@ class AzureDevOpsService
     }
 
     /**
-     * Usuario dueño del PAT (cache 1h).
+     * Identidad del dueño del PAT. Sin cache: se usa al iniciar sesión para
+     * obtener el id que trae System.AssignedTo.
      */
-    public function getCurrentUser()
+    public function getAuthenticatedUser()
     {
         try {
-            return Cache::remember('azure.current_user', now()->addHour(), function () {
-                $data = $this->orgClient('7.1-preview')->get('connectionData')->json('authenticatedUser') ?? [];
+            $data = $this->orgClient('7.1-preview')->get('connectionData')->json('authenticatedUser') ?? [];
 
-                return [
-                    'id' => $data['id'] ?? null,
-                    'displayName' => $data['providerDisplayName'] ?? $data['customDisplayName'] ?? 'Usuario',
-                    'uniqueName' => $data['properties']['Account']['$value'] ?? null,
-                ];
-            });
+            if (empty($data['id']) || empty($data['properties']['Account']['$value'])) {
+                return ['error' => 'Azure DevOps no reconoció el PAT', 'status' => 401];
+            }
+
+            return [
+                'id' => $data['id'],
+                'displayName' => $data['providerDisplayName'] ?? $data['customDisplayName'] ?? 'Usuario',
+                'uniqueName' => $data['properties']['Account']['$value'],
+            ];
         } catch (\Throwable $e) {
-            return $this->formatError($e, 'Error al obtener el usuario actual');
+            return $this->formatError($e, 'Error al validar el PAT');
         }
+    }
+
+    /**
+     * Scopes de lectura que le faltan al PAT (con una consulta por scope). El
+     * permiso de escritura de Work Items no se puede probar sin escribir.
+     *
+     * @return string[]
+     */
+    public function missingPatScopes(): array
+    {
+        $checks = [
+            'Project and Team (Read)' => fn () => $this->orgClient()->get('projects/'.rawurlencode($this->project)),
+            'Work Items (Read & Write)' => fn () => $this->client()->get('wit/workitemtypes'),
+            'Code (Read)' => fn () => $this->client()->get('git/repositories'),
+            'Build (Read)' => fn () => $this->client()->get('build/builds', ['$top' => 1]),
+        ];
+
+        $missing = [];
+        foreach ($checks as $scope => $check) {
+            try {
+                $check();
+            } catch (\Throwable) {
+                $missing[] = $scope;
+            }
+        }
+
+        return $missing;
     }
 
     // ---------------------------------------------------------------------

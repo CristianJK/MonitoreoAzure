@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ToastHost from '@/components/ToastHost.vue';
 import { initials } from '@/composables/useWorkItemStyles';
 import { useSession } from '@/composables/useSession';
 
 const route = useRoute();
-const { currentUser, pendingApprovals, loadCurrentUser, refreshPendingApprovals } = useSession();
+const router = useRouter();
+const { currentUser, pendingApprovals, logout, refreshPendingApprovals } = useSession();
 const menuOpen = ref(false);
+const loggingOut = ref(false);
 
 const navigation = [
   { name: 'dashboard', label: 'Overview', icon: 'dashboard' },
@@ -15,10 +17,20 @@ const navigation = [
   { name: 'agent-inbox', label: 'Comentarios por revisar', icon: 'smart_toy', badge: true },
 ] as const;
 
-onMounted(() => {
-  loadCurrentUser();
-  refreshPendingApprovals();
-});
+// El router carga el usuario antes de entrar; el contador se pide al tener sesión
+watch(() => currentUser.value?.id, (id) => {
+  if (id) refreshPendingApprovals();
+}, { immediate: true });
+
+const signOut = async () => {
+  loggingOut.value = true;
+  try {
+    await logout();
+  } finally {
+    loggingOut.value = false;
+    router.replace({ name: 'login' });
+  }
+};
 
 watch(() => route.fullPath, () => {
   menuOpen.value = false;
@@ -29,7 +41,13 @@ const isActive = (name: string) =>
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-on-background flex flex-col md:flex-row">
+  <!-- Login: sin menú ni barra superior -->
+  <template v-if="route.meta.public || !currentUser">
+    <router-view />
+    <ToastHost />
+  </template>
+
+  <div v-else class="min-h-screen bg-background text-on-background flex flex-col md:flex-row">
 
     <!-- Fondo del menú en móvil -->
     <div v-if="menuOpen" class="fixed inset-0 bg-black/50 z-40 md:hidden" aria-hidden="true" @click="menuOpen = false"></div>
@@ -76,12 +94,22 @@ const isActive = (name: string) =>
       <div class="p-4 border-t border-outline-variant">
         <div class="flex items-center gap-3 px-2">
           <div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-xs font-bold text-on-surface border border-outline-variant shrink-0">
-            {{ initials(currentUser?.displayName) }}
+            {{ initials(currentUser.displayName) }}
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-on-surface truncate">{{ currentUser?.displayName ?? 'Cargando...' }}</p>
-            <p class="text-xs text-on-surface-variant truncate">{{ currentUser?.uniqueName ?? 'Dueño del PAT' }}</p>
+            <p class="text-sm font-medium text-on-surface truncate">{{ currentUser.displayName }}</p>
+            <p class="text-xs text-on-surface-variant truncate">{{ currentUser.uniqueName }}</p>
           </div>
+          <button
+            type="button"
+            class="btn-ghost p-1.5 rounded-lg shrink-0"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            :disabled="loggingOut"
+            @click="signOut"
+          >
+            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">logout</span>
+          </button>
         </div>
       </div>
     </aside>
@@ -114,9 +142,9 @@ const isActive = (name: string) =>
         </router-link>
         <div
           class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-sm"
-          :title="currentUser?.displayName"
+          :title="currentUser.displayName"
         >
-          {{ initials(currentUser?.displayName) }}
+          {{ initials(currentUser.displayName) }}
         </div>
       </div>
     </header>

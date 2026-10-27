@@ -23,10 +23,12 @@ class AgentApproval extends Model
 
     protected $fillable = [
         'work_item_metadata_id',
+        'owner_user_id',
         'action_code',
         'status',
         'requested_by',
         'resolved_by',
+        'resolved_by_user_id',
         'payload',
         'result',
         'resolved_at',
@@ -44,5 +46,10 @@ class AgentApproval extends Model
     public function workItemMetadata(): BelongsTo
     {
         return $this->belongsTo(WorkItemMetadata::class);
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
     }
 }

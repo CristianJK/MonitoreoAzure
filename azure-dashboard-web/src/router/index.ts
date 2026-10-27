@@ -1,10 +1,25 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardView from '@/views/DashboardView.vue'
 import WorkItemView from '@/views/WorkItemView.vue'
+import { useSession } from '@/composables/useSession'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    title?: string
+    /** No requiere sesión (solo el login) */
+    public?: boolean
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { title: 'Iniciar sesión', public: true },
+    },
     {
       path: '/',
       name: 'dashboard',
@@ -35,6 +50,18 @@ const router = createRouter({
       redirect: { name: 'dashboard' },
     },
   ],
+})
+
+// Toda la aplicación requiere sesión; el backend vuelve a validar cada petición
+router.beforeEach(async (to) => {
+  const user = await useSession().loadCurrentUser()
+
+  if (!user && !to.meta.public) {
+    return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
+  }
+  if (user && to.name === 'login') {
+    return { path: (to.query.redirect as string) || '/' }
+  }
 })
 
 router.afterEach((to) => {

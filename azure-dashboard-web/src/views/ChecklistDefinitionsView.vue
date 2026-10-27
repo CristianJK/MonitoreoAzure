@@ -12,8 +12,11 @@ import {
 import { workItemService, type WorkItemType } from '@/services/workItemService';
 import { errorMessage } from '@/services/apiClient';
 import { useToast } from '@/composables/useToast';
+import { useSession } from '@/composables/useSession';
 
 const toast = useToast();
+// El catálogo es de solo lectura salvo para los administradores (AUTH_ADMINS)
+const { isAdmin } = useSession();
 
 const definitions = ref<ChecklistDefinition[]>([]);
 const types = ref<WorkItemType[]>([]);
@@ -169,7 +172,7 @@ const sourceIcon = (source: ChecklistSource) => (source === 'manual' ? 'edit_not
                         Items que se deben cumplir en cada estado del Work Item antes del paso a producción.
                     </p>
                 </div>
-                <button type="button" class="btn btn-primary" :disabled="loading" @click="openCreate()">
+                <button v-if="isAdmin" type="button" class="btn btn-primary" :disabled="loading" @click="openCreate()">
                     <span class="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
                     Nuevo item
                 </button>
@@ -208,7 +211,7 @@ const sourceIcon = (source: ChecklistSource) => (source === 'manual' ? 'edit_not
                 <p class="text-on-surface mt-2">
                     {{ definitions.length ? 'Ningún item coincide con los filtros.' : 'Todavía no hay items de alistamiento.' }}
                 </p>
-                <button v-if="!definitions.length" type="button" class="btn btn-primary mt-4" @click="openCreate()">Crear el primero</button>
+                <button v-if="!definitions.length && isAdmin" type="button" class="btn btn-primary mt-4" @click="openCreate()">Crear el primero</button>
             </div>
 
             <!-- Grupos por estado -->
@@ -224,7 +227,7 @@ const sourceIcon = (source: ChecklistSource) => (source === 'manual' ? 'edit_not
                         {{ group.state }}
                         <span class="text-body-sm font-normal text-on-surface-variant">({{ group.items.length }})</span>
                     </h2>
-                    <button type="button" class="btn btn-ghost btn-sm" @click="openCreate(group.state)">
+                    <button v-if="isAdmin" type="button" class="btn btn-ghost btn-sm" @click="openCreate(group.state)">
                         <span class="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
                         Agregar
                     </button>
@@ -245,7 +248,7 @@ const sourceIcon = (source: ChecklistSource) => (source === 'manual' ? 'edit_not
                         <tbody class="divide-y divide-outline-variant">
                             <tr v-for="(definition, index) in group.items" :key="definition.id" class="hover:bg-surface-variant/50">
                                 <td class="px-4 py-2.5">
-                                    <div class="flex flex-col">
+                                    <div v-if="isAdmin" class="flex flex-col">
                                         <button type="button" class="btn-ghost rounded leading-none disabled:opacity-30" :disabled="index === 0" :aria-label="`Subir ${definition.label}`" @click="move(group.items, index, -1)">
                                             <span class="material-symbols-outlined text-[18px]" aria-hidden="true">keyboard_arrow_up</span>
                                         </button>
@@ -272,7 +275,7 @@ const sourceIcon = (source: ChecklistSource) => (source === 'manual' ? 'edit_not
                                     <span v-else class="text-on-surface-variant" aria-label="No">—</span>
                                 </td>
                                 <td class="px-4 py-2.5">
-                                    <div class="flex justify-end gap-1">
+                                    <div v-if="isAdmin" class="flex justify-end gap-1">
                                         <button type="button" class="btn-ghost p-1.5 rounded-lg" :aria-label="`Editar ${definition.label}`" title="Editar" @click="openEdit(definition)">
                                             <span class="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span>
                                         </button>

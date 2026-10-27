@@ -5,6 +5,7 @@ namespace App\Services\Agents;
 use App\Jobs\RunDailyCommentAgent;
 use App\Models\AgentApproval;
 use App\Models\AgentRun;
+use App\Models\User;
 use App\Models\WorkItemMetadata;
 use App\Services\AzureDevOpsService;
 use Carbon\CarbonImmutable;
@@ -13,7 +14,11 @@ use Illuminate\Support\Str;
 
 /**
  * Flujo del comentario diario: propuesta → revisión del usuario → publicación.
- * Nada se publica en Azure DevOps sin pasar por approve().
+ * Nada se publica en Azure DevOps sin pasar por approve(), que se ejecuta con
+ * la sesión del dueño del work item (el comentario queda a su nombre).
+ *
+ * Las dependencias usan el PAT del usuario actual: en los jobs, resolver este
+ * servicio dentro de User::actAs().
  */
 class AgentCommentService
 {
@@ -28,13 +33,13 @@ class AgentCommentService
      * Recolecta el avance del día y deja una propuesta pendiente de revisión.
      * Si no hay commits hoy, la propuesta queda sin texto (comentario manual).
      */
-    public function propose(int $workItemId, string $trigger, ?string $batchId = null): AgentApproval|array
+    public function propose(int $workItemId, string $trigger, ?string $batchId, User $owner): AgentApproval|array
     {
         $today = $this->today();
 
         $progress = $this->collector->collect($workItemId);
         if (is_array($progress)) {
-            $this->recordRun($workItemId, $trigger, $batchId, ['status' => 'error', 'error' => $progress['error']]);
+            $this->recordRun($workItemId, $trigger, $batchId, ['user_id' => $owner->id, 'status' => 'error', 'error' => $progress['error']]);
 
             return $progress;
         }
@@ -59,6 +64,7 @@ class AgentCommentService
         }
 
         $approval = $metadata->approvals()->create([
+            'owner_user_id' => $owner->id,
             'action_code' => $progress->hasCommits()
                 ? AgentApproval::ACTION_DAILY_COMMENT
                 : AgentApproval::ACTION_DAILY_COMMENT_MANUAL,
@@ -68,6 +74,7 @@ class AgentCommentService
         ]);
 
         $this->recordRun($workItemId, $trigger, $batchId, [
+            'user_id' => $owner->id,
             'status' => $progress->hasCommits() ? 'proposal' : 'manual_required',
             'agent_approval_id' => $approval->id,
             'summary' => [
@@ -97,7 +104,7 @@ class AgentCommentService
     /**
      * Publica en Azure DevOps el texto revisado por el usuario.
      */
-    public function approve(AgentApproval $approval, string $text, ?string $user, bool $force = false): AgentApproval|array
+    public function approve(AgentApproval $approval, string $text, User $user, bool $force = false): AgentApproval|array
     {
         if ($approval->status !== AgentApproval::PENDING) {
             return ['error' => "La propuesta ya fue resuelta ({$approval->status})", 'status' => 409];
@@ -116,7 +123,8 @@ class AgentCommentService
 
         $approval->update([
             'status' => AgentApproval::PUBLISHED,
-            'resolved_by' => $user,
+            'resolved_by' => $user->name,
+            'resolved_by_user_id' => $user->id,
             'resolved_at' => now(),
             'payload' => [...$approval->payload, 'final_text' => $text],
             'result' => $comment,
@@ -127,7 +135,7 @@ class AgentCommentService
         return $approval;
     }
 
-    public function reject(AgentApproval $approval, ?string $user): AgentApproval|array
+    public function reject(AgentApproval $approval, User $user): AgentApproval|array
     {
         if ($approval->status !== AgentApproval::PENDING) {
             return ['error' => "La propuesta ya fue resuelta ({$approval->status})", 'status' => 409];
@@ -135,7 +143,8 @@ class AgentCommentService
 
         $approval->update([
             'status' => AgentApproval::REJECTED,
-            'resolved_by' => $user,
+            'resolved_by' => $user->name,
+            'resolved_by_user_id' => $user->id,
             'resolved_at' => now(),
         ]);
 
@@ -143,15 +152,15 @@ class AgentCommentService
     }
 
     /**
-     * Encola un job por cada work item abierto del usuario.
+     * Encola un job por cada work item abierto del usuario (@Me = dueño del PAT).
      *
      * @return array{batch_id: string, count: int}|array{error: string}
      */
-    public function startBatch(?string $assignedTo, string $trigger): array
+    public function startBatch(User $user, string $trigger): array
     {
         $this->expireStale();
 
-        $ids = $this->azure->getOpenWorkItemIds($assignedTo);
+        $ids = $this->azure->getOpenWorkItemIds('@Me');
         if (isset($ids['error'])) {
             return $ids;
         }
@@ -159,8 +168,8 @@ class AgentCommentService
         $batchId = (string) Str::uuid();
 
         foreach ($ids as $id) {
-            $this->recordRun($id, $trigger, $batchId, ['status' => 'queued', 'agent_approval_id' => null, 'summary' => null]);
-            RunDailyCommentAgent::dispatch($id, $trigger, $batchId);
+            $this->recordRun($id, $trigger, $batchId, ['user_id' => $user->id, 'status' => 'queued', 'agent_approval_id' => null, 'summary' => null]);
+            RunDailyCommentAgent::dispatch($id, $trigger, $batchId, $user->id);
         }
 
         return ['batch_id' => $batchId, 'count' => count($ids)];

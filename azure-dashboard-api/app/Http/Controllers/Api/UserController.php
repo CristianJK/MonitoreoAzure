@@ -23,15 +23,4 @@ class UserController extends Controller
 
         return response()->json(['data' => $users]);
     }
-
-    public function me(): JsonResponse
-    {
-        $user = $this->azureDevOpsService->getCurrentUser();
-
-        if (isset($user['error'])) {
-            return $this->azureError($user);
-        }
-
-        return response()->json(['data' => $user]);
-    }
 }

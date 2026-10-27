@@ -4,12 +4,34 @@ import { useRoute, useRouter } from 'vue-router';
 import AgentCommentReviewModal from '@/components/AgentCommentReviewModal.vue';
 import { agentService, type AgentApproval, type AgentRun } from '@/services/agentService';
 import { errorMessage } from '@/services/apiClient';
+import { userService } from '@/services/userService';
 import { formatDate } from '@/composables/useWorkItemStyles';
 import { useSession } from '@/composables/useSession';
+import { useToast } from '@/composables/useToast';
 
 const route = useRoute();
 const router = useRouter();
-const { refreshPendingApprovals } = useSession();
+const toast = useToast();
+const { currentUser, refreshPendingApprovals } = useSession();
+
+// Ejecución programada (lunes a viernes) con el PAT del usuario guardado en el servidor
+const savingSchedule = ref(false);
+const toggleSchedule = async () => {
+    if (!currentUser.value) return;
+    savingSchedule.value = true;
+    try {
+        currentUser.value = await userService.updatePreferences({
+            agent_schedule_enabled: !currentUser.value.agentScheduleEnabled,
+        });
+        toast.success(currentUser.value.agentScheduleEnabled
+            ? 'Ejecución programada activada'
+            : 'Ejecución programada desactivada');
+    } catch (e) {
+        toast.error(errorMessage(e, 'No se pudo guardar la preferencia'));
+    } finally {
+        savingSchedule.value = false;
+    }
+};
 
 const approvals = ref<AgentApproval[]>([]);
 const loading = ref(true);
@@ -110,11 +132,26 @@ const clearBatch = () => router.replace({ query: {} });
 <template>
     <main class="flex-1 p-4 md:p-6 overflow-y-auto bg-background">
         <div class="max-w-5xl mx-auto space-y-6">
-            <div>
-                <h1 class="text-headline-lg font-headline-lg text-on-surface">Comentarios por revisar</h1>
-                <p class="text-body-sm text-on-surface-variant mt-1">
-                    Propuestas del agente (ejecución manual, en lote o programada). Nada se publica en Azure DevOps sin tu revisión.
-                </p>
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                <div>
+                    <h1 class="text-headline-lg font-headline-lg text-on-surface">Comentarios por revisar</h1>
+                    <p class="text-body-sm text-on-surface-variant mt-1">
+                        Tus propuestas del agente (ejecución manual, en lote o programada). Nada se publica en Azure DevOps sin tu revisión.
+                    </p>
+                </div>
+                <label
+                    class="flex items-center gap-2 text-body-sm text-on-surface cursor-pointer shrink-0"
+                    title="Usa tu PAT guardado en el servidor; se conserva aunque cierres sesión mientras esté activa"
+                >
+                    <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-primary-container"
+                        :checked="currentUser?.agentScheduleEnabled"
+                        :disabled="savingSchedule"
+                        @change="toggleSchedule"
+                    />
+                    Ejecución programada diaria
+                </label>
             </div>
 
             <!-- Progreso del lote -->

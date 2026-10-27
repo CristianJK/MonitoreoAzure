@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\ChecklistDefinition;
 use App\Models\ChecklistStatus;
 use App\Models\WorkItemMetadata;
-use App\Services\AzureDevOpsService;
 use App\Services\WorkItemChecklistService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +26,7 @@ class WorkItemChecklistController extends Controller
         return response()->json(['data' => $result]);
     }
 
-    public function update(Request $request, int $id, ChecklistDefinition $definition, AzureDevOpsService $azure): JsonResponse
+    public function update(Request $request, int $id, ChecklistDefinition $definition): JsonResponse
     {
         if ($definition->source->value !== 'manual') {
             return response()->json(['message' => 'Este item se calcula automáticamente desde Azure DevOps.'], 422);
@@ -41,10 +40,8 @@ class WorkItemChecklistController extends Controller
             'value.regex' => 'Debe ser un link de SharePoint (https://<empresa>.sharepoint.com/...).',
         ]);
 
-        $user = $azure->getCurrentUser();
-
         return response()->json([
-            'data' => $this->checklist->saveValue($id, $definition, $data, $user['displayName'] ?? null),
+            'data' => $this->checklist->saveValue($id, $definition, $data, $request->user()->name),
         ]);
     }
 

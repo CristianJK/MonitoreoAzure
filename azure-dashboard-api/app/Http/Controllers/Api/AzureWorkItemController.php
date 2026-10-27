@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AzureDevOpsService;
+use App\Services\WorkItemOwnership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,13 +45,14 @@ class AzureWorkItemController extends Controller
             return $this->azureError($workItems);
         }
 
-        $formattedItems = array_map(function ($item) {
+        $formattedItems = array_map(function ($item) use ($request) {
             return [
                 'id' => $item['id'],
                 'title' => $item['fields']['System.Title'] ?? 'Sin título',
                 'state' => $item['fields']['System.State'] ?? 'Desconocido',
                 'type' => $item['fields']['System.WorkItemType'] ?? '',
                 'assigned_to' => $item['fields']['System.AssignedTo']['displayName'] ?? 'Sin asignar',
+                'is_mine' => WorkItemOwnership::matches($request->user(), $item['fields']['System.AssignedTo'] ?? null),
             ];
         }, $workItems['items']);
 
@@ -66,13 +68,18 @@ class AzureWorkItemController extends Controller
         ]);
     }
 
-    public function show($id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
         $result = $this->azureDevOpsService->getWorkItemFullDetails($id);
 
         if (isset($result['error'])) {
             return $this->azureError($result);
         }
+
+        // Solo informativo para la UI: las rutas de escritura vuelven a validar en Azure
+        $result['permissions'] = [
+            'can_edit' => WorkItemOwnership::matches($request->user(), $result['assigned_to_obj']),
+        ];
 
         return response()->json(['data' => $result]);
     }
@@ -126,8 +133,9 @@ class AzureWorkItemController extends Controller
     {
         // Validamos que el frontend envíe los datos necesarios
         $request->validate([
-            'repository_id' => 'required|string',
-            'branch_name' => 'required|string',
+            'repository_id' => 'required|uuid',
+            // Nombre de rama Git sin "refs/heads/": letras, números, . _ - y /, sin ".."
+            'branch_name' => ['required', 'string', 'max:250', 'regex:#^[\w.\-]+(/[\w.\-]+)*$#u', 'not_regex:#\.\.#'],
         ]);
 
         $result = $this->azureDevOpsService->linkBranchToWorkItem(
@@ -149,7 +157,7 @@ class AzureWorkItemController extends Controller
     public function linkPullRequest(Request $request, $id): JsonResponse
     {
         $request->validate([
-            'artifact_id' => 'required|string',
+            'artifact_id' => 'required|string|max:500',
         ]);
 
         $result = $this->azureDevOpsService->linkPullRequestToWorkItem(

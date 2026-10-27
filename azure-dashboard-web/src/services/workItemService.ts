@@ -1,6 +1,7 @@
 import { apiClient } from './apiClient';
 
 export interface AzureIdentity {
+    id?: string;
     displayName?: string;
     uniqueName?: string;
     imageUrl?: string;
@@ -36,6 +37,10 @@ export interface WorkItem {
     type: string;
     assigned_to: string;
     assigned_to_obj?: AzureIdentity | null;
+    /** En el listado: asignado al usuario de la sesión */
+    is_mine?: boolean;
+    /** En el detalle: solo informativo, el backend vuelve a validar al escribir */
+    permissions?: { can_edit: boolean };
     description?: string;
     created_by?: AzureIdentity | null;
     created_date?: string;

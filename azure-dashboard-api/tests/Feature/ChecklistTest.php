@@ -14,6 +14,13 @@ class ChecklistTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAsAzureUser();
+    }
+
     protected function fakeAzure(array $relations = []): void
     {
         Http::fake([
@@ -28,7 +35,6 @@ class ChecklistTest extends TestCase
                 'id' => 1, 'buildNumber' => '20261026.1', 'status' => 'completed', 'result' => 'failed',
                 'definition' => ['name' => 'CI'], '_links' => ['web' => ['href' => 'https://build/1']],
             ]]]),
-            '*/_apis/connectionData*' => Http::response(['authenticatedUser' => ['providerDisplayName' => 'Ana']]),
         ]);
     }
 
