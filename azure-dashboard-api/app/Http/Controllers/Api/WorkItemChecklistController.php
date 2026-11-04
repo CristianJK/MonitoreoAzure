@@ -46,6 +46,20 @@ class WorkItemChecklistController extends Controller
     }
 
     /**
+     * Enlaza en Azure (pestaña Links) los documentos de SharePoint ya registrados.
+     */
+    public function syncLinks(int $id): JsonResponse
+    {
+        $result = $this->checklist->syncDocumentLinks($id);
+
+        if (isset($result['error'])) {
+            return $this->azureError($result);
+        }
+
+        return response()->json(['data' => $result]);
+    }
+
+    /**
      * Avance del alistamiento de varios WIs (solo los que ya tienen metadatos).
      */
     public function summaries(Request $request): JsonResponse

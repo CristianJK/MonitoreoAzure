@@ -119,8 +119,14 @@ export const checklistService = {
         workItemId: number,
         definitionId: number,
         payload: { value: string | boolean | null; status?: ChecklistItemStatus | null; notes?: string | null },
-    ): Promise<{ item: ChecklistItem; summary: ChecklistSummary }> {
+    ): Promise<{ item: ChecklistItem; summary: ChecklistSummary; warning?: string }> {
         const response = await apiClient.put(`/work-items/${workItemId}/checklist/${definitionId}`, payload);
+        return response.data.data;
+    },
+
+    /** Enlaza en Azure (pestaña Links del WI) los documentos de SharePoint registrados */
+    async syncDocumentLinks(workItemId: number): Promise<{ added: number; already_linked: number; total: number }> {
+        const response = await apiClient.post(`/work-items/${workItemId}/checklist/sync-links`);
         return response.data.data;
     },
 

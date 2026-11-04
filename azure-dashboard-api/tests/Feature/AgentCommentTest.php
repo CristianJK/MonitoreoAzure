@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\RunDailyCommentAgent;
 use App\Models\AgentApproval;
+use App\Services\Agents\ClosureSummary;
 use App\Services\Agents\CommentGenerator;
 use App\Services\Agents\DailyProgress;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -146,6 +147,11 @@ class AgentCommentTest extends TestCase
         $this->app->bind(CommentGenerator::class, fn () => new class implements CommentGenerator
         {
             public function generate(DailyProgress $progress): string
+            {
+                throw new \RuntimeException('Copilot Studio no respondió');
+            }
+
+            public function generateClosure(ClosureSummary $summary): string
             {
                 throw new \RuntimeException('Copilot Studio no respondió');
             }

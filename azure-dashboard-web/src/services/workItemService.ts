@@ -21,6 +21,7 @@ export interface LinkedPullRequest {
     status?: 'active' | 'completed' | 'abandoned' | string;
     isDraft?: boolean;
     creationDate?: string | null;
+    closedDate?: string | null;
     repository?: string;
     sourceBranch?: string;
     targetBranch?: string;

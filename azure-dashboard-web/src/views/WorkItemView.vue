@@ -8,6 +8,8 @@ import type { ChecklistItem, WorkItemChecklist as Checklist } from '@/services/c
 import StateBadge from '@/components/StateBadge.vue';
 import WorkItemChecklist from '@/components/WorkItemChecklist.vue';
 import AgentCommentReviewModal from '@/components/AgentCommentReviewModal.vue';
+import ClosureCommentModal from '@/components/ClosureCommentModal.vue';
+import LinkBranchModal from '@/components/LinkBranchModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import { formatDate, initials, typeColor, typeIcon } from '@/composables/useWorkItemStyles';
 import { sanitizeHtml } from '@/composables/useSanitize';
@@ -116,6 +118,9 @@ const loadStates = async (type: string) => {
 const currentCategory = computed(() =>
     states.value.find((s) => s.name === workItemData.value?.state)?.category);
 
+// Finalizado (categoría Completed, p. ej. Done): aplica el comentario de cierre en vez del diario
+const isCompleted = computed(() => currentCategory.value === 'Completed');
+
 const stateOptions = computed(() => {
     const names = states.value.map((s) => s.name);
     // Si el estado actual no está en la lista (p. ej. sin conexión), se muestra igual
@@ -179,6 +184,24 @@ const changeState = async (state: string) => {
 // ---------------------------------------------------------------------------
 const runningAgent = ref(false);
 const approval = ref<AgentApproval | null>(null);
+// Propuestas de cierre por revisar (una por PR), se muestran de a una
+const reviewQueue = ref<AgentApproval[]>([]);
+const closureOpen = ref(false);
+const linkPrOpen = ref(false);
+
+const onClosureCreated = (approvals: AgentApproval[]) => {
+    refreshPendingApprovals();
+    loadDetails(); // los PRs elegidos quedan enlazados
+    if (!approvals.length) return;
+    toast.success(approvals.length === 1
+        ? 'Propuesta de cierre generada, revísala antes de publicar'
+        : `${approvals.length} propuestas de cierre generadas (una por PR)`);
+    [approval.value, ...reviewQueue.value] = approvals;
+};
+
+const closeReview = () => {
+    approval.value = reviewQueue.value.shift() ?? null;
+};
 
 const runAgent = async () => {
     if (!workItemData.value) return;
@@ -257,6 +280,17 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                         </div>
                     </div>
                     <button
+                        v-if="isCompleted"
+                        type="button"
+                        class="btn btn-primary"
+                        title="Pide el repositorio y el PR, y propone un comentario de cierre con fechas y resumen técnico por cada PR"
+                        @click="closureOpen = true"
+                    >
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">task_alt</span>
+                        Comentario de cierre
+                    </button>
+                    <button
+                        v-else
                         type="button"
                         class="btn btn-primary"
                         :disabled="runningAgent"
@@ -438,6 +472,16 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                         <span class="material-symbols-outlined text-[16px]" aria-hidden="true">merge</span>
                         Pull Requests
                         <span class="ml-auto bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-full font-label-mono text-[10px] normal-case">{{ workItemData.pull_requests?.length ?? 0 }}</span>
+                        <button
+                            v-if="canEdit"
+                            type="button"
+                            class="btn-ghost p-1 rounded normal-case"
+                            title="Vincular un Pull Request"
+                            aria-label="Vincular un Pull Request"
+                            @click="linkPrOpen = true"
+                        >
+                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">add_link</span>
+                        </button>
                     </h3>
                     <ul v-if="workItemData.pull_requests?.length" class="flex flex-col gap-2">
                         <li v-for="pr in workItemData.pull_requests" :key="`${pr.repositoryId}-${pr.id}`" class="p-2.5 bg-surface-container rounded-lg border border-outline-variant text-xs">
@@ -466,6 +510,13 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                             </template>
                         </li>
                     </ul>
+                    <div v-else-if="isCompleted" class="flex items-start gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/30 text-xs text-on-surface">
+                        <span class="material-symbols-outlined text-warning text-[18px] shrink-0" aria-hidden="true">warning</span>
+                        <div>
+                            <p>Este work item está finalizado y no tiene Pull Request asociado.</p>
+                            <button v-if="canEdit" type="button" class="text-primary hover:underline font-semibold mt-1" @click="linkPrOpen = true">Asociar PR</button>
+                        </div>
+                    </div>
                     <p v-else class="text-on-surface-variant italic text-xs">Sin Pull Requests asociados</p>
                 </div>
 
@@ -501,8 +552,25 @@ const onApprovalResolved = (resolved: AgentApproval) => {
         <AgentCommentReviewModal
             :open="!!approval"
             :approval="approval"
-            @close="approval = null"
+            @close="closeReview"
             @resolved="onApprovalResolved"
+        />
+
+        <ClosureCommentModal
+            v-if="workItemData"
+            :open="closureOpen"
+            :work-item-id="workItemData.id"
+            :linked-pull-requests="workItemData.pull_requests ?? []"
+            @close="closureOpen = false"
+            @created="onClosureCreated"
+        />
+
+        <LinkBranchModal
+            v-if="workItemData && linkPrOpen"
+            :is-open="linkPrOpen"
+            :work-item-id="workItemData.id"
+            @close="linkPrOpen = false"
+            @linked="loadDetails"
         />
     </div>
 </template>

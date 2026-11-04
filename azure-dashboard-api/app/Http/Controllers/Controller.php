@@ -33,9 +33,13 @@ abstract class Controller
             403 => 403,
             404 => 404,
             409 => 409,
+            422 => 422,
             default => 500,
         };
 
-        return response()->json(['message' => $result['error']], $status);
+        return response()->json(array_filter([
+            'message' => $result['error'],
+            'code' => $result['code'] ?? null,
+        ]), $status);
     }
 }

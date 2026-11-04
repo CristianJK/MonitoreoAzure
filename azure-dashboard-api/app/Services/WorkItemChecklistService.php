@@ -70,6 +70,8 @@ class WorkItemChecklistService
         }
         $value = $value === '' ? null : $value;
 
+        $previous = $metadata->checklistStatuses()->where('checklist_definition_id', $definition->id)->value('value');
+
         $status = ChecklistStatus::updateOrCreate(
             ['work_item_metadata_id' => $metadata->id, 'checklist_definition_id' => $definition->id],
             [
@@ -81,10 +83,97 @@ class WorkItemChecklistService
             ],
         );
 
-        return [
+        $warning = $definition->data_type === ChecklistDataType::SharepointLink
+            ? $this->updateDocumentLink($workItemId, $metadata, $definition, $previous, $status->value)
+            : null;
+
+        return array_filter([
             'item' => $this->itemPayload($definition, $status, []),
             'summary' => $this->summarize($metadata),
-        ];
+            'warning' => $warning,
+        ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * Enlaza en Azure (pestaña Links del WI) todos los documentos de SharePoint
+     * registrados en el alistamiento que aún no estén enlazados.
+     *
+     * @return array{added: int, already_linked: int, total: int}|array{error: string}
+     */
+    public function syncDocumentLinks(int $workItemId): array
+    {
+        $workItem = $this->azure->getWorkItemById($workItemId);
+        if (isset($workItem['error'])) {
+            return $workItem;
+        }
+
+        $existing = AzureDevOpsService::hyperlinks($workItem['relations'] ?? []);
+        $documents = $this->documentLinks(WorkItemMetadata::forWorkItem($workItemId, $workItem['fields']['System.WorkItemType'] ?? ''));
+
+        $added = 0;
+        $alreadyLinked = 0;
+
+        foreach ($documents as $url => $label) {
+            if (collect($existing)->contains(fn ($e) => AzureDevOpsService::sameUrl($e, $url))) {
+                $alreadyLinked++;
+
+                continue;
+            }
+
+            $result = $this->azure->addHyperlink($workItemId, $url, $label);
+            if (isset($result['error'])) {
+                return $result;
+            }
+            $result['added'] ? $added++ : $alreadyLinked++;
+        }
+
+        return ['added' => $added, 'already_linked' => $alreadyLinked, 'total' => count($documents)];
+    }
+
+    /**
+     * URL => nombre del item, de los valores sharepoint_link del work item.
+     *
+     * @return array<string, string>
+     */
+    protected function documentLinks(WorkItemMetadata $metadata): array
+    {
+        return $metadata->checklistStatuses()
+            ->whereNotNull('value')
+            ->get()
+            ->map(fn ($s) => [$s, ChecklistDefinition::withTrashed()->find($s->checklist_definition_id)])
+            ->filter(fn ($pair) => $pair[1]?->data_type === ChecklistDataType::SharepointLink)
+            ->mapWithKeys(fn ($pair) => [$pair[0]->value => $pair[1]->label])
+            ->all();
+    }
+
+    /**
+     * Mantiene el hyperlink del documento en Azure al cambiar el valor. Si Azure
+     * falla, el valor queda guardado igual y se devuelve una advertencia.
+     */
+    protected function updateDocumentLink(int $workItemId, WorkItemMetadata $metadata, ChecklistDefinition $definition, ?string $previous, ?string $current): ?string
+    {
+        if ($previous === $current || ($previous !== null && $current !== null && AzureDevOpsService::sameUrl($previous, $current))) {
+            return null;
+        }
+
+        $documents = $this->documentLinks($metadata);
+
+        // Solo se quita si ningún otro item del alistamiento usa el mismo link
+        if ($previous !== null && ! collect(array_keys($documents))->contains(fn ($u) => AzureDevOpsService::sameUrl($u, $previous))) {
+            $removed = $this->azure->removeHyperlink($workItemId, $previous);
+            if (isset($removed['error'])) {
+                return "El valor se guardó, pero no se pudo quitar el link anterior en Azure DevOps: {$removed['error']}";
+            }
+        }
+
+        if ($current !== null) {
+            $added = $this->azure->addHyperlink($workItemId, $current, $definition->label);
+            if (isset($added['error'])) {
+                return "El valor se guardó, pero no se pudo enlazar el documento en Azure DevOps: {$added['error']}";
+            }
+        }
+
+        return null;
     }
 
     /**

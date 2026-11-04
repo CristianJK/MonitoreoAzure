@@ -11,14 +11,24 @@ export interface Branch {
     objectId: string;
 }
 
+export type PullRequestStatus = 'active' | 'completed' | 'abandoned' | 'all';
+
 export interface PullRequest {
     pullRequestId: number;
     title: string;
+    status: Exclude<PullRequestStatus, 'all'> | string;
+    repositoryId: string;
+    repository: string;
     sourceRefName: string;
     targetRefName: string;
     createdBy: string;
-    repository_id: string;
+    creationDate: string | null;
+    closedDate: string | null;
     artifactId: string;
+}
+
+export interface PullRequestSuggestion extends PullRequest {
+    matchReason: string;
 }
 
 export const repositoryService = {
@@ -40,15 +50,23 @@ export const repositoryService = {
         return response.data;
     },
 
-    async getPullRequests(repositoryId: string): Promise<PullRequest[]> {
-        const response = await apiClient.get<PullRequest[]>(`/repositories/${repositoryId}/pull-requests`);
+    async getPullRequests(repositoryId: string, status: PullRequestStatus = 'active', search?: string): Promise<PullRequest[]> {
+        const response = await apiClient.get<PullRequest[]>(`/repositories/${repositoryId}/pull-requests`, {
+            params: { status, search: search || undefined },
+        });
         return response.data;
     },
 
+    /** PRs que probablemente corresponden al WI y aún no están enlazados */
+    async getPullRequestSuggestions(workItemId: number): Promise<PullRequestSuggestion[]> {
+        const response = await apiClient.get<{ data: PullRequestSuggestion[] }>(`/work-items/${workItemId}/pull-request-suggestions`);
+        return response.data.data;
+    },
+
     async linkPullRequest(workItemId: number, artifactId: string): Promise<any> {
-    const response = await apiClient.post(`/work-items/${workItemId}/link-pr`, {
-        artifact_id: artifactId
-    });
-    return response.data;
-}
+        const response = await apiClient.post(`/work-items/${workItemId}/link-pr`, {
+            artifact_id: artifactId
+        });
+        return response.data;
+    }
 };

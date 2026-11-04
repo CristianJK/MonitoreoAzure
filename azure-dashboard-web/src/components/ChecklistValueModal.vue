@@ -61,6 +61,7 @@ const save = async () => {
         };
         const result = await checklistService.saveValue(props.workItemId, props.item.definition_id, payload);
         toast.success(`"${props.item.label}" actualizado`);
+        if (result.warning) toast.error(result.warning);
         emit('saved', result.item, result.summary);
         emit('close');
     } catch (e) {

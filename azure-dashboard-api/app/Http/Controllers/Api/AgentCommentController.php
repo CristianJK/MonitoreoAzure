@@ -36,6 +36,31 @@ class AgentCommentController extends Controller
         return $this->approvalResponse($approval, 201);
     }
 
+    /**
+     * Comentario de cierre (WI finalizado): una propuesta por cada PR elegido. Nunca publica.
+     */
+    public function proposeClosure(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'pull_requests' => 'required|array|min:1|max:10',
+            'pull_requests.*.repositoryId' => 'required|string|max:100',
+            'pull_requests.*.pullRequestId' => 'required|integer|min:1',
+        ], [
+            'pull_requests.required' => 'Selecciona el repositorio y el Pull Request del work item.',
+            'pull_requests.min' => 'Selecciona el repositorio y el Pull Request del work item.',
+        ]);
+
+        $result = $this->agent->proposeClosure($id, $validated['pull_requests'], $request->user());
+
+        if (isset($result['error'])) {
+            return $this->azureError($result);
+        }
+
+        $approvals = collect($result)->each->load('workItemMetadata');
+
+        return response()->json(['data' => AgentApprovalResource::collection($approvals)], 201);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $request->validate([

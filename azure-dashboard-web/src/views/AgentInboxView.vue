@@ -222,7 +222,8 @@ const clearBatch = () => router.replace({ query: {} });
                             </div>
                             <p class="text-[12px] text-on-surface-variant mt-1 flex flex-wrap gap-x-3">
                                 <span>{{ origin(approval) }} · {{ formatDate(approval.created_at) }}</span>
-                                <span v-if="approval.has_commits">{{ approval.context?.commits.length }} commits hoy</span>
+                                <span v-if="approval.action_code === 'closure_comment'" class="text-primary font-semibold">Cierre · PR !{{ approval.pull_request?.id }}</span>
+                                <span v-if="approval.has_commits">{{ approval.context?.commits.length }} {{ approval.action_code === 'closure_comment' ? 'commits en el PR' : 'commits hoy' }}</span>
                                 <span v-else-if="!approval.context?.pull_requests.length && !approval.context?.branches.length">Sin PR ni rama asociados</span>
                                 <span v-if="approval.fallback_reason" class="text-warning">Generado sin IA</span>
                             </p>

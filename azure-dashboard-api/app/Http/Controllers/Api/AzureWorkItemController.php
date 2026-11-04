@@ -174,4 +174,18 @@ class AzureWorkItemController extends Controller
             'data' => $result,
         ]);
     }
+
+    /**
+     * PRs que probablemente corresponden al work item y no están enlazados.
+     */
+    public function pullRequestSuggestions(int $id): JsonResponse
+    {
+        $result = $this->azureDevOpsService->getPullRequestSuggestions($id);
+
+        if (isset($result['error'])) {
+            return $this->azureError($result);
+        }
+
+        return response()->json(['data' => $result]);
+    }
 }

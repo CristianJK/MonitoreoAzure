@@ -4,6 +4,7 @@ import ChecklistValueModal from './ChecklistValueModal.vue';
 import { checklistService, STATUS_LABELS, type ChecklistItem, type ChecklistSummary, type WorkItemChecklist } from '@/services/checklistService';
 import { errorMessage } from '@/services/apiClient';
 import { formatDate } from '@/composables/useWorkItemStyles';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps<{
     workItemId: number;
@@ -22,6 +23,27 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selected = ref<ChecklistItem | null>(null);
 const collapsed = ref<Record<string, boolean>>({});
+const syncing = ref(false);
+const toast = useToast();
+
+const documentCount = computed(() => checklist.value?.groups
+    .flatMap((g) => g.items)
+    .filter((i) => i.data_type === 'sharepoint_link' && !!i.value).length ?? 0);
+
+// Enlaza en Azure (pestaña Links del WI) los documentos de SharePoint ya registrados
+const syncLinks = async () => {
+    syncing.value = true;
+    try {
+        const result = await checklistService.syncDocumentLinks(props.workItemId);
+        if (!result.total) toast.info('No hay documentos de SharePoint registrados en el alistamiento');
+        else if (!result.added) toast.info('Los documentos ya estaban enlazados en el work item');
+        else toast.success(`${result.added} documento(s) enlazado(s) en Azure DevOps`);
+    } catch (e) {
+        toast.error(errorMessage(e, 'No se pudieron enlazar los documentos'));
+    } finally {
+        syncing.value = false;
+    }
+};
 
 const load = async () => {
     loading.value = true;
@@ -99,9 +121,22 @@ defineExpose({ reload: load });
                 <span class="material-symbols-outlined text-[16px]" aria-hidden="true">fact_check</span>
                 Alistamiento
             </h3>
-            <button type="button" class="btn-ghost p-1 rounded" title="Recargar desde Azure" aria-label="Recargar alistamiento" :disabled="loading" @click="load">
-                <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': loading }" aria-hidden="true">refresh</span>
-            </button>
+            <span class="flex items-center gap-1">
+                <button
+                    v-if="!readonly && documentCount"
+                    type="button"
+                    class="btn-ghost p-1 rounded"
+                    title="Sincronizar links: agrega los documentos de SharePoint a la pestaña Links del work item en Azure DevOps"
+                    aria-label="Sincronizar links de SharePoint con el work item"
+                    :disabled="syncing"
+                    @click="syncLinks"
+                >
+                    <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': syncing }" aria-hidden="true">{{ syncing ? 'sync' : 'add_link' }}</span>
+                </button>
+                <button type="button" class="btn-ghost p-1 rounded" title="Recargar desde Azure" aria-label="Recargar alistamiento" :disabled="loading" @click="load">
+                    <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': loading }" aria-hidden="true">refresh</span>
+                </button>
+            </span>
         </div>
 
         <div v-if="loading && !checklist" class="text-body-sm text-on-surface-variant">Cargando alistamiento...</div>

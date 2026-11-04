@@ -5,6 +5,7 @@ import { agentService, type AgentApproval } from '@/services/agentService';
 import { errorCode, errorMessage } from '@/services/apiClient';
 import { useToast } from '@/composables/useToast';
 import { useSession } from '@/composables/useSession';
+import { formatDate } from '@/composables/useWorkItemStyles';
 
 /**
  * Revisión de la propuesta del agente. Con commits muestra el texto de Copilot
@@ -35,9 +36,14 @@ watch(() => props.approval, (approval) => {
 
 const context = computed(() => props.approval?.context);
 const isManual = computed(() => props.approval ? !props.approval.has_commits : false);
-const fileCount = computed(() => new Set(context.value?.commits.flatMap((c) => c.files) ?? []).size);
+const isClosure = computed(() => props.approval?.action_code === 'closure_comment');
+const fileCount = computed(() => context.value?.files?.length
+    ?? new Set(context.value?.commits.flatMap((c) => c.files ?? []) ?? []).size);
 
-const title = computed(() => isManual.value ? 'Comentario manual del día' : 'Revisar comentario del agente');
+const title = computed(() => {
+    if (isClosure.value) return `Revisar comentario de cierre · PR !${props.approval?.pull_request?.id ?? ''}`;
+    return isManual.value ? 'Comentario manual del día' : 'Revisar comentario del agente';
+});
 
 const publish = async () => {
     if (!props.approval || !text.value.trim()) return;
@@ -124,7 +130,7 @@ const discard = async () => {
                     <span class="flex flex-wrap items-center gap-x-3 gap-y-1 text-on-surface">
                         <span class="flex items-center gap-1">
                             <span class="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">commit</span>
-                            {{ context.commits.length }} commits hoy
+                            {{ context.commits.length }} {{ isClosure ? 'commits en el PR' : 'commits hoy' }}
                         </span>
                         <span class="flex items-center gap-1">
                             <span class="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">description</span>
@@ -144,7 +150,7 @@ const discard = async () => {
                     </p>
                     <ul class="space-y-1">
                         <li v-for="commit in context.commits" :key="commit.commitId" class="flex gap-2">
-                            <span class="font-label-mono text-on-surface shrink-0">{{ commit.time }}</span>
+                            <span class="font-label-mono text-on-surface shrink-0">{{ commit.time ?? formatDate(commit.date, false) }}</span>
                             <span class="min-w-0">
                                 <span class="text-on-surface">{{ commit.message.split('\n')[0] }}</span>
                                 <span class="font-label-mono"> · {{ commit.commitId.substring(0, 7) }} · {{ commit.author }}</span>
@@ -179,7 +185,9 @@ const discard = async () => {
 
             <div v-if="alreadyPublished" class="flex items-start gap-2.5 p-3 rounded-lg bg-warning/10 border border-warning/30 text-body-sm text-on-surface" role="alert">
                 <span class="material-symbols-outlined text-warning text-[20px] shrink-0" aria-hidden="true">warning</span>
-                Ya se publicó hoy un comentario del agente en este Work Item. Presiona "Publicar de todas formas" para publicar otro.
+                <template v-if="isClosure">Ya se publicó el comentario de cierre de este PR en el Work Item.</template>
+                <template v-else>Ya se publicó hoy un comentario del agente en este Work Item.</template>
+                Presiona "Publicar de todas formas" para publicar otro.
             </div>
         </div>
 

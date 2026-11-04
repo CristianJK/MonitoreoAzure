@@ -27,6 +27,7 @@ Route::middleware(['auth:sanctum', 'azure.pat'])->group(function () {
     Route::get('/work-items/checklist-summary', [WorkItemChecklistController::class, 'summaries']);
     Route::get('/work-items/{id}', [AzureWorkItemController::class, 'show'])->whereNumber('id');
     Route::get('/work-items/{id}/checklist', [WorkItemChecklistController::class, 'show'])->whereNumber('id');
+    Route::get('/work-items/{id}/pull-request-suggestions', [AzureWorkItemController::class, 'pullRequestSuggestions'])->whereNumber('id');
 
     Route::middleware(['throttle:writes', 'audit', 'work-item.owner'])->group(function () {
         Route::post('/work-items/{id}/comments', [AzureWorkItemController::class, 'addComment'])->whereNumber('id');
@@ -34,7 +35,9 @@ Route::middleware(['auth:sanctum', 'azure.pat'])->group(function () {
         Route::post('/work-items/{id}/link-branch', [AzureWorkItemController::class, 'linkBranch'])->whereNumber('id');
         Route::post('/work-items/{id}/link-pr', [AzureWorkItemController::class, 'linkPullRequest'])->whereNumber('id');
         Route::put('/work-items/{id}/checklist/{definition}', [WorkItemChecklistController::class, 'update'])->whereNumber('id');
+        Route::post('/work-items/{id}/checklist/sync-links', [WorkItemChecklistController::class, 'syncLinks'])->whereNumber('id');
         Route::post('/work-items/{id}/agent/daily-comment', [AgentCommentController::class, 'propose'])->whereNumber('id');
+        Route::post('/work-items/{id}/agent/closure-comment', [AgentCommentController::class, 'proposeClosure'])->whereNumber('id');
     });
 
     Route::get('/work-item-types', [WorkItemTypeController::class, 'index']);

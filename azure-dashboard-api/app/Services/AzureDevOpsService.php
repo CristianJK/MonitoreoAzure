@@ -625,28 +625,123 @@ class AzureDevOpsService
      */
     public function getActivePullRequests($repositoryId)
     {
+        return $this->getPullRequests($repositoryId);
+    }
+
+    /**
+     * Pull Requests de un repositorio por estado (active | completed | abandoned | all).
+     * La API no busca por texto: $search filtra por título, rama o id en PHP.
+     */
+    public function getPullRequests(string $repositoryId, string $status = 'active', ?string $search = null, int $top = 100)
+    {
         try {
             $prs = $this->client()
-                ->get("git/repositories/{$repositoryId}/pullrequests", ['searchCriteria.status' => 'active'])
+                ->get("git/repositories/{$repositoryId}/pullrequests", [
+                    'searchCriteria.status' => $status,
+                    '$top' => $top,
+                ])
                 ->json('value') ?? [];
 
-            return array_map(function ($pr) {
-                $projectGuid = $pr['repository']['project']['id'];
-                $repoGuid = $pr['repository']['id'];
-                $prId = $pr['pullRequestId'];
+            $items = array_map(fn ($pr) => $this->formatPullRequestListItem($pr), $prs);
 
-                return [
-                    'pullRequestId' => $prId,
-                    'title' => $pr['title'],
-                    'sourceRefName' => str_replace('refs/heads/', '', $pr['sourceRefName'] ?? ''),
-                    'targetRefName' => str_replace('refs/heads/', '', $pr['targetRefName'] ?? ''),
-                    'createdBy' => $pr['createdBy']['displayName'] ?? 'Desconocido',
-                    'artifactId' => "vstfs:///Git/PullRequestId/{$projectGuid}/{$repoGuid}/{$prId}",
-                ];
-            }, $prs);
+            $search = trim((string) $search);
+            if ($search !== '') {
+                $needle = mb_strtolower(ltrim($search, '!#'));
+                $items = array_values(array_filter($items, fn ($pr) => str_contains(mb_strtolower(
+                    "{$pr['pullRequestId']} {$pr['title']} {$pr['sourceRefName']}"
+                ), $needle)));
+            }
+
+            return $items;
         } catch (\Throwable $e) {
             return $this->formatError($e, 'Error al obtener Pull Requests');
         }
+    }
+
+    /**
+     * PRs que probablemente corresponden al work item y aún no están enlazados:
+     * primero los creados desde una rama enlazada, luego los que mencionan el id
+     * en el título (#123, AB#123) o en el nombre de la rama (feature/123-x).
+     */
+    public function getPullRequestSuggestions(int $workItemId)
+    {
+        $workItem = $this->getWorkItemById($workItemId);
+        if (isset($workItem['error'])) {
+            return $workItem;
+        }
+
+        try {
+            $links = self::parseArtifactLinks($workItem['relations'] ?? []);
+            $linked = array_column($links['pull_requests'], 'pullRequestId');
+            $suggestions = [];
+
+            foreach ($links['branches'] as $branch) {
+                $prs = $this->client()
+                    ->get("git/repositories/{$branch['repositoryId']}/pullrequests", [
+                        'searchCriteria.status' => 'all',
+                        'searchCriteria.sourceRefName' => 'refs/heads/'.$branch['branch'],
+                        '$top' => 20,
+                    ])
+                    ->json('value') ?? [];
+
+                foreach ($prs as $pr) {
+                    $suggestions[$pr['pullRequestId']] ??= [
+                        ...$this->formatPullRequestListItem($pr),
+                        'matchReason' => "Creado desde la rama enlazada {$branch['branch']}",
+                    ];
+                }
+            }
+
+            $prs = $this->client()
+                ->get('git/pullrequests', ['searchCriteria.status' => 'all', '$top' => 300])
+                ->json('value') ?? [];
+
+            foreach ($prs as $pr) {
+                $reason = $this->pullRequestMentions($pr, $workItemId);
+                if ($reason) {
+                    $suggestions[$pr['pullRequestId']] ??= [...$this->formatPullRequestListItem($pr), 'matchReason' => $reason];
+                }
+            }
+
+            return array_values(array_filter($suggestions, fn ($pr) => ! in_array($pr['pullRequestId'], $linked, true)));
+        } catch (\Throwable $e) {
+            return $this->formatError($e, 'Error al buscar Pull Requests sugeridos');
+        }
+    }
+
+    protected function pullRequestMentions(array $pr, int $workItemId): ?string
+    {
+        if (preg_match('/(^|[^\w])(AB)?#'.$workItemId.'(?!\d)/i', $pr['title'] ?? '')) {
+            return "El título menciona #{$workItemId}";
+        }
+
+        $branch = str_replace('refs/heads/', '', $pr['sourceRefName'] ?? '');
+        if (preg_match('/(^|[\/_-])'.$workItemId.'([\/_-]|$)/', $branch)) {
+            return "La rama {$branch} contiene el id";
+        }
+
+        return null;
+    }
+
+    protected function formatPullRequestListItem(array $pr): array
+    {
+        $projectGuid = $pr['repository']['project']['id'] ?? '';
+        $repoGuid = $pr['repository']['id'] ?? '';
+        $prId = $pr['pullRequestId'];
+
+        return [
+            'pullRequestId' => $prId,
+            'title' => $pr['title'] ?? '',
+            'status' => $pr['status'] ?? '',
+            'repositoryId' => $repoGuid,
+            'repository' => $pr['repository']['name'] ?? '',
+            'sourceRefName' => str_replace('refs/heads/', '', $pr['sourceRefName'] ?? ''),
+            'targetRefName' => str_replace('refs/heads/', '', $pr['targetRefName'] ?? ''),
+            'createdBy' => $pr['createdBy']['displayName'] ?? 'Desconocido',
+            'creationDate' => $pr['creationDate'] ?? null,
+            'closedDate' => $pr['closedDate'] ?? null,
+            'artifactId' => "vstfs:///Git/PullRequestId/{$projectGuid}/{$repoGuid}/{$prId}",
+        ];
     }
 
     /**
@@ -678,6 +773,88 @@ class AzureDevOpsService
             ]]), 'application/json-patch+json')
             ->patch("wit/workitems/{$workItemId}")
             ->json();
+    }
+
+    /**
+     * Agrega un hyperlink (pestaña Links del work item). Si ya existe, no hace nada.
+     */
+    public function addHyperlink(int $workItemId, string $url, string $comment = ''): array
+    {
+        try {
+            $this->client()
+                ->withBody(json_encode([[
+                    'op' => 'add',
+                    'path' => '/relations/-',
+                    'value' => ['rel' => 'Hyperlink', 'url' => $url, 'attributes' => ['comment' => $comment]],
+                ]]), 'application/json-patch+json')
+                ->patch("wit/workitems/{$workItemId}");
+
+            return ['added' => true];
+        } catch (RequestException $e) {
+            if (str_contains($e->response->body(), 'already exists') || str_contains($e->response->body(), 'RelationAlreadyExists')) {
+                return ['added' => false];
+            }
+
+            return $this->formatError($e, 'Fallo al enlazar el documento en el Work Item');
+        } catch (\Throwable $e) {
+            return $this->formatError($e, 'Fallo al enlazar el documento en el Work Item');
+        }
+    }
+
+    /**
+     * Quita un hyperlink por URL. Si no existe, no hace nada.
+     */
+    public function removeHyperlink(int $workItemId, string $url): array
+    {
+        try {
+            $workItem = $this->client()->get("wit/workitems/{$workItemId}", ['$expand' => 'relations'])->json();
+            $index = self::hyperlinkIndex($workItem['relations'] ?? [], $url);
+
+            if ($index === null) {
+                return ['removed' => false];
+            }
+
+            // "test" sobre la revisión evita borrar otra relación si el WI cambió entre medio
+            $this->client()
+                ->withBody(json_encode([
+                    ['op' => 'test', 'path' => '/rev', 'value' => $workItem['rev']],
+                    ['op' => 'remove', 'path' => "/relations/{$index}"],
+                ]), 'application/json-patch+json')
+                ->patch("wit/workitems/{$workItemId}");
+
+            return ['removed' => true];
+        } catch (\Throwable $e) {
+            return $this->formatError($e, 'Fallo al quitar el documento del Work Item');
+        }
+    }
+
+    /**
+     * URLs de los hyperlinks del work item.
+     *
+     * @return string[]
+     */
+    public static function hyperlinks(array $relations): array
+    {
+        return collect($relations)
+            ->filter(fn ($r) => ($r['rel'] ?? '') === 'Hyperlink')
+            ->pluck('url')
+            ->all();
+    }
+
+    protected static function hyperlinkIndex(array $relations, string $url): ?int
+    {
+        foreach (array_values($relations) as $index => $relation) {
+            if (($relation['rel'] ?? '') === 'Hyperlink' && self::sameUrl($relation['url'] ?? '', $url)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    public static function sameUrl(string $a, string $b): bool
+    {
+        return rtrim(rawurldecode(trim($a)), '/') === rtrim(rawurldecode(trim($b)), '/');
     }
 
     /**
@@ -738,12 +915,15 @@ class AzureDevOpsService
                 'status' => $pr['status'] ?? '',
                 'isDraft' => (bool) ($pr['isDraft'] ?? false),
                 'creationDate' => $pr['creationDate'] ?? null,
+                'closedDate' => $pr['closedDate'] ?? null,
+                'closedBy' => $pr['closedBy']['displayName'] ?? null,
                 'repositoryId' => $repositoryId,
                 'repository' => $repoName,
                 'sourceBranch' => str_replace('refs/heads/', '', $pr['sourceRefName'] ?? ''),
                 'targetBranch' => str_replace('refs/heads/', '', $pr['targetRefName'] ?? ''),
                 'createdBy' => $pr['createdBy']['displayName'] ?? null,
                 'url' => "{$this->organizationUrl}/".rawurlencode($this->project).'/_git/'.rawurlencode($repoName)."/pullrequest/{$pullRequestId}",
+                'artifactId' => 'vstfs:///Git/PullRequestId/'.($pr['repository']['project']['id'] ?? rawurlencode($this->project))."/{$repositoryId}/{$pullRequestId}",
             ];
         } catch (\Throwable $e) {
             return $this->formatError($e, "Error al obtener el Pull Request {$pullRequestId}");
@@ -763,6 +943,56 @@ class AzureDevOpsService
             return $this->filterCommitsSince($commits, $since);
         } catch (\Throwable $e) {
             return $this->formatError($e, "Error al obtener los commits del Pull Request {$pullRequestId}");
+        }
+    }
+
+    /**
+     * Todos los commits de un PR (sin merges), del más antiguo al más reciente.
+     */
+    public function getPullRequestCommits(string $repositoryId, int $pullRequestId)
+    {
+        try {
+            $commits = $this->client()
+                ->get("git/repositories/{$repositoryId}/pullRequests/{$pullRequestId}/commits", ['$top' => 250])
+                ->json('value') ?? [];
+
+            return collect($this->filterCommitsSince($commits, Carbon::createFromTimestamp(0)))
+                ->sortBy('date')
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            return $this->formatError($e, "Error al obtener los commits del Pull Request {$pullRequestId}");
+        }
+    }
+
+    /**
+     * Archivos modificados por el PR completo (cambios de su última iteración).
+     */
+    public function getPullRequestChangedFiles(string $repositoryId, int $pullRequestId, int $limit = 100): array
+    {
+        try {
+            $iterations = $this->client()
+                ->get("git/repositories/{$repositoryId}/pullRequests/{$pullRequestId}/iterations")
+                ->json('value') ?? [];
+
+            $last = collect($iterations)->max('id');
+            if (! $last) {
+                return [];
+            }
+
+            $changes = $this->client()
+                ->get("git/repositories/{$repositoryId}/pullRequests/{$pullRequestId}/iterations/{$last}/changes", ['$top' => $limit])
+                ->json('changeEntries') ?? [];
+
+            return collect($changes)
+                ->reject(fn ($c) => ($c['item']['gitObjectType'] ?? 'blob') === 'tree' || ! empty($c['item']['isFolder']))
+                ->map(fn ($c) => $c['item']['path'] ?? $c['originalPath'] ?? '')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            return [];
         }
     }
 

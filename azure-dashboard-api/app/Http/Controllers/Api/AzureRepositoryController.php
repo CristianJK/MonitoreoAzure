@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\AzureDevOpsService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class AzureRepositoryController extends Controller
 {
@@ -37,9 +38,18 @@ class AzureRepositoryController extends Controller
         return response()->json($branches);
     }
 
-    public function pullRequests($repositoryId): JsonResponse
+    public function pullRequests(Request $request, $repositoryId): JsonResponse
     {
-        $prs = $this->azureDevOpsService->getActivePullRequests($repositoryId);
+        $validated = $request->validate([
+            'status' => 'nullable|in:active,completed,abandoned,all',
+            'search' => 'nullable|string|max:200',
+        ]);
+
+        $prs = $this->azureDevOpsService->getPullRequests(
+            $repositoryId,
+            $validated['status'] ?? 'active',
+            $validated['search'] ?? null,
+        );
 
         if (isset($prs['error'])) {
             return $this->azureError($prs);

@@ -32,6 +32,46 @@ class CopilotStudioCommentGenerator implements CommentGenerator
         return static::stripHeader($text);
     }
 
+    public function generateClosure(ClosureSummary $summary): string
+    {
+        if (! $this->client) {
+            throw new RuntimeException('Copilot Studio no está configurado (falta COPILOT_DIRECTLINE_SECRET)');
+        }
+
+        $text = $this->client->ask($this->closurePrompt($summary));
+
+        if (mb_strlen($text) < 10) {
+            throw new RuntimeException('Copilot Studio devolvió una respuesta vacía');
+        }
+
+        return static::stripHeader($text);
+    }
+
+    protected function closurePrompt(ClosureSummary $summary): string
+    {
+        $pr = $summary->pullRequest;
+        $data = [
+            'work_item' => $summary->workItem,
+            'pull_request' => [
+                'title' => $pr['title'] ?? '',
+                'source_branch' => $pr['sourceBranch'] ?? '',
+                'target_branch' => $pr['targetBranch'] ?? '',
+                'repository' => $pr['repository'] ?? '',
+            ],
+            'commits' => array_map(fn ($c) => ['message' => $c['message'], 'date' => $c['date']], $summary->commits),
+            'files' => $summary->files,
+        ];
+        $count = count($data['commits']);
+
+        return "Redacta en español el resumen técnico de cierre de este Pull Request de Azure DevOps a partir del JSON adjunto.\n"
+            ."Reglas obligatorias:\n"
+            ."- Describe qué se implementó o corrigió en el PR completo; el JSON trae {$count} commits y debes cubrirlos todos.\n"
+            ."- Agrupa por funcionalidad o área (usa las rutas de archivos); usa una lista markdown de máximo 10 viñetas.\n"
+            ."- No agregues título, encabezado, fechas, número de PR, rama, saludo ni despedida: empieza directamente con la primera viñeta.\n"
+            ."- No inventes información que no esté en el JSON. Responde solo con el resumen.\n"
+            ."\n```json\n".json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n```";
+    }
+
     protected function prompt(DailyProgress $progress): string
     {
         $data = $progress->toArray();

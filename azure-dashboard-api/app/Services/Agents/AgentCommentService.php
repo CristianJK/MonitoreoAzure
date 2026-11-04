@@ -25,6 +25,7 @@ class AgentCommentService
     public function __construct(
         protected AzureDevOpsService $azure,
         protected DailyProgressCollector $collector,
+        protected ClosureSummaryCollector $closureCollector,
         protected CommentGenerator $generator,
         protected TemplateCommentGenerator $fallback,
     ) {}
@@ -89,8 +90,100 @@ class AgentCommentService
         return $approval;
     }
 
+    /**
+     * Comentario de cierre manual: un work item en un estado de categoría
+     * Completed y los PRs que el usuario elige. Crea una propuesta por PR
+     * (enlazando al WI los que falten). Nunca publica.
+     *
+     * @param  array<int, array{repositoryId: string, pullRequestId: int}>  $pullRequests
+     * @return AgentApproval[]|array ['error' => ...]
+     */
+    public function proposeClosure(int $workItemId, array $pullRequests, User $owner): array
+    {
+        if ($pullRequests === []) {
+            return ['error' => 'Selecciona el repositorio y el Pull Request del work item.', 'status' => 422, 'code' => 'pull_request_required'];
+        }
+
+        $workItem = $this->azure->getWorkItemById($workItemId);
+        if (isset($workItem['error'])) {
+            return $workItem;
+        }
+
+        $type = $workItem['fields']['System.WorkItemType'] ?? '';
+        $state = $workItem['fields']['System.State'] ?? '';
+        $typeStates = $this->azure->getWorkItemTypeStates($type);
+        if (isset($typeStates['error'])) {
+            return $typeStates;
+        }
+
+        $category = collect($typeStates)->firstWhere('name', $state)['category'] ?? null;
+        if ($category !== 'Completed') {
+            return ['error' => "El comentario de cierre solo se genera con el work item finalizado (estado actual: {$state}).", 'status' => 422, 'code' => 'not_completed'];
+        }
+
+        $prs = [];
+        foreach ($pullRequests as $ref) {
+            $pr = $this->azure->getPullRequest($ref['repositoryId'], (int) $ref['pullRequestId']);
+            if (isset($pr['error'])) {
+                return $pr;
+            }
+            if ($pr['status'] !== 'completed') {
+                return ['error' => "El Pull Request !{$pr['id']} no está completado ({$pr['status']}).", 'status' => 422, 'code' => 'pull_request_not_completed'];
+            }
+            $prs[$pr['id']] = $pr;
+        }
+
+        $linked = array_column(AzureDevOpsService::parseArtifactLinks($workItem['relations'] ?? [])['pull_requests'], 'pullRequestId');
+        foreach ($prs as $pr) {
+            if (! in_array($pr['id'], $linked, true)) {
+                $link = $this->azure->linkPullRequestToWorkItem($workItemId, $pr['artifactId']);
+                if (isset($link['error'])) {
+                    return $link;
+                }
+            }
+        }
+
+        $metadata = WorkItemMetadata::forWorkItem($workItemId, $type);
+        $pending = $metadata->approvals()
+            ->where('status', AgentApproval::PENDING)
+            ->where('action_code', AgentApproval::ACTION_CLOSURE_COMMENT)
+            ->get();
+
+        $approvals = [];
+        foreach ($prs as $pr) {
+            // Reemplaza solo la propuesta pendiente del mismo PR
+            $pending->filter(fn ($a) => ($a->payload['pull_request']['id'] ?? null) === $pr['id'])
+                ->each(fn ($a) => $a->update(['status' => AgentApproval::REPLACED, 'resolved_at' => now()]));
+
+            $summary = $this->closureCollector->collect($workItem, $pr, $typeStates);
+
+            $approvals[] = $metadata->approvals()->create([
+                'owner_user_id' => $owner->id,
+                'action_code' => AgentApproval::ACTION_CLOSURE_COMMENT,
+                'status' => AgentApproval::PENDING,
+                'requested_by' => 'manual',
+                'payload' => [
+                    'date' => $this->today()->toDateString(),
+                    'work_item' => $summary->workItem,
+                    'pull_request' => ['id' => $pr['id'], 'repositoryId' => $pr['repositoryId'], 'title' => $pr['title']],
+                    'context' => $summary->toArray(),
+                    ...$this->generateClosureBody($summary),
+                ],
+            ]);
+        }
+
+        return $approvals;
+    }
+
     public function regenerate(AgentApproval $approval): AgentApproval|array
     {
+        if ($approval->status === AgentApproval::PENDING && $approval->action_code === AgentApproval::ACTION_CLOSURE_COMMENT) {
+            $summary = ClosureSummary::fromArray($approval->payload['context']);
+            $approval->update(['payload' => [...$approval->payload, ...$this->generateClosureBody($summary)]]);
+
+            return $approval;
+        }
+
         if ($approval->status !== AgentApproval::PENDING || $approval->action_code !== AgentApproval::ACTION_DAILY_COMMENT) {
             return ['error' => 'Solo se pueden regenerar propuestas pendientes con commits', 'status' => 409];
         }
@@ -112,7 +205,12 @@ class AgentCommentService
 
         $workItemId = (int) $approval->workItemMetadata->azure_work_item_id;
 
-        if (! $force && $this->publishedToday($workItemId)) {
+        if ($approval->action_code === AgentApproval::ACTION_CLOSURE_COMMENT) {
+            $pullRequestId = $approval->payload['pull_request']['id'] ?? null;
+            if (! $force && $this->closurePublished($workItemId, $pullRequestId)) {
+                return ['error' => "Ya se publicó el comentario de cierre del PR !{$pullRequestId} en este Work Item", 'status' => 409, 'code' => 'already_published'];
+            }
+        } elseif (! $force && $this->publishedToday($workItemId)) {
             return ['error' => 'Ya se publicó hoy un comentario del agente en este Work Item', 'status' => 409, 'code' => 'already_published'];
         }
 
@@ -180,7 +278,9 @@ class AgentCommentService
      */
     public function expireStale(): int
     {
+        // Las de cierre no son "del día": se mantienen hasta que el usuario las resuelva
         return AgentApproval::where('status', AgentApproval::PENDING)
+            ->whereIn('action_code', AgentApproval::DAILY_ACTIONS)
             ->where('created_at', '<', $this->today()->utc())
             ->update(['status' => AgentApproval::EXPIRED, 'resolved_at' => now()]);
     }
@@ -188,9 +288,19 @@ class AgentCommentService
     public function publishedToday(int $workItemId): bool
     {
         return AgentApproval::where('status', AgentApproval::PUBLISHED)
+            ->whereIn('action_code', AgentApproval::DAILY_ACTIONS)
             ->where('resolved_at', '>=', $this->today()->utc())
             ->whereHas('workItemMetadata', fn ($q) => $q->where('azure_work_item_id', (string) $workItemId))
             ->exists();
+    }
+
+    public function closurePublished(int $workItemId, ?int $pullRequestId): bool
+    {
+        return AgentApproval::where('status', AgentApproval::PUBLISHED)
+            ->where('action_code', AgentApproval::ACTION_CLOSURE_COMMENT)
+            ->whereHas('workItemMetadata', fn ($q) => $q->where('azure_work_item_id', (string) $workItemId))
+            ->get(['payload'])
+            ->contains(fn ($a) => ($a->payload['pull_request']['id'] ?? null) === $pullRequestId);
     }
 
     public function recordRun(int $workItemId, string $trigger, ?string $batchId, array $values): void
@@ -229,6 +339,41 @@ class AgentCommentService
 
         return [
             'proposal' => "**🤖 Resumen automático del día ({$date})**\n\n".trim($body),
+            'generator' => $generator,
+            'fallback_reason' => $fallbackReason,
+        ];
+    }
+
+    /**
+     * @return array{proposal: string, generator: string, fallback_reason: ?string}
+     */
+    protected function generateClosureBody(ClosureSummary $summary): array
+    {
+        $fallbackReason = null;
+
+        try {
+            $body = $this->generator->generateClosure($summary);
+            $generator = $this->generator->name();
+        } catch (\Throwable $e) {
+            Log::warning('Fallo el generador del comentario de cierre, se usa la plantilla', [
+                'work_item' => $summary->workItem['id'],
+                'error' => $e->getMessage(),
+            ]);
+            $body = $this->fallback->generateClosure($summary);
+            $generator = $this->fallback->name();
+            $fallbackReason = $e->getMessage();
+        }
+
+        $pr = $summary->pullRequest;
+        $sections = [
+            "**🤖 Resumen de cierre — [PR !{$pr['id']} {$pr['title']}]({$pr['url']})**",
+            $summary->datesMarkdown(config('agents.timezone')),
+            "**Resumen técnico**\n\n".trim($body),
+            $summary->filesMarkdown(),
+        ];
+
+        return [
+            'proposal' => implode("\n\n", array_filter($sections)),
             'generator' => $generator,
             'fallback_reason' => $fallbackReason,
         ];

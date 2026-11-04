@@ -45,4 +45,17 @@ class TemplateCommentGenerator implements CommentGenerator
 
         return implode("\n", $lines);
     }
+
+    public function generateClosure(ClosureSummary $summary): string
+    {
+        if ($summary->commits === []) {
+            return '- '.($summary->pullRequest['title'] ?? 'Sin commits registrados en el PR');
+        }
+
+        return collect($summary->commits)
+            ->map(fn ($c) => strtok($c['message'], "\n") ?: '(sin mensaje)')
+            ->unique()
+            ->map(fn ($m) => "- {$m}")
+            ->implode("\n");
+    }
 }

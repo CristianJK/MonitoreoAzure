@@ -5,18 +5,32 @@ export interface DailyCommit {
     message: string;
     author: string;
     date: string;
-    time: string;
-    repository: string;
-    files: string[];
+    /** Solo en el comentario diario (hora local del commit) */
+    time?: string;
+    repository?: string;
+    files?: string[];
 }
 
 export interface DailyContext {
+    /** 'closure' en el comentario de cierre; ausente en el diario */
+    kind?: 'closure';
     work_item: { id: number; title: string; type: string; state: string };
-    date: string;
-    pull_requests: { id: number; title: string; status: string; repository: string; sourceBranch: string; targetBranch: string; url: string }[];
+    date?: string;
+    pull_requests: {
+        id: number; title: string; status: string; repository: string; sourceBranch: string; targetBranch: string; url: string;
+        creationDate?: string | null; closedDate?: string | null;
+    }[];
     branches: { repository: string; name: string }[];
     commits: DailyCommit[];
+    /** Comentario de cierre: fechas del WI y archivos del PR completo */
+    dates?: { created: string | null; activated: string | null; closed: string | null };
+    files?: string[];
     warnings: string[];
+}
+
+export interface ClosurePullRequestRef {
+    repositoryId: string;
+    pullRequestId: number;
 }
 
 export type ApprovalStatus = 'Pendiente' | 'Publicado' | 'Rechazado' | 'Reemplazado' | 'Vencido';
@@ -25,8 +39,10 @@ export interface AgentApproval {
     id: number;
     work_item_id: number;
     work_item: DailyContext['work_item'] | null;
-    action_code: 'daily_comment' | 'daily_comment_manual';
+    action_code: 'daily_comment' | 'daily_comment_manual' | 'closure_comment';
     has_commits: boolean;
+    /** Solo en el comentario de cierre */
+    pull_request: { id: number; repositoryId: string; title: string } | null;
     status: ApprovalStatus;
     requested_by: 'manual' | 'batch' | 'scheduled';
     resolved_by: string | null;
@@ -58,6 +74,16 @@ export const agentService = {
         const response = await apiClient.post<{ data: AgentApproval }>(`/work-items/${workItemId}/agent/daily-comment`, null, {
             timeout: 120_000,
         });
+        return response.data.data;
+    },
+
+    /** Comentario de cierre (WI finalizado): una propuesta por cada PR. No publica. */
+    async proposeClosure(workItemId: number, pullRequests: ClosurePullRequestRef[]): Promise<AgentApproval[]> {
+        const response = await apiClient.post<{ data: AgentApproval[] }>(
+            `/work-items/${workItemId}/agent/closure-comment`,
+            { pull_requests: pullRequests },
+            { timeout: 180_000 },
+        );
         return response.data.data;
     },
 

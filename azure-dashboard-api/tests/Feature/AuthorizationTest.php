@@ -50,6 +50,8 @@ class AuthorizationTest extends TestCase
             'enlazar PR' => ['POST', '/api/work-items/10/link-pr', ['artifact_id' => 'vstfs:///Git/PullRequestId/p/r/1']],
             'alistamiento' => ['PUT', '/api/work-items/10/checklist/{definition}', ['value' => true]],
             'agente' => ['POST', '/api/work-items/10/agent/daily-comment', []],
+            'cierre' => ['POST', '/api/work-items/10/agent/closure-comment', ['pull_requests' => [['repositoryId' => 'repo', 'pullRequestId' => 1]]]],
+            'sincronizar links' => ['POST', '/api/work-items/10/checklist/sync-links', []],
         ];
     }
 

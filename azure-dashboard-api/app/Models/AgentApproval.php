@@ -21,6 +21,10 @@ class AgentApproval extends Model
 
     public const ACTION_DAILY_COMMENT_MANUAL = 'daily_comment_manual';
 
+    public const ACTION_CLOSURE_COMMENT = 'closure_comment';
+
+    public const DAILY_ACTIONS = [self::ACTION_DAILY_COMMENT, self::ACTION_DAILY_COMMENT_MANUAL];
+
     protected $fillable = [
         'work_item_metadata_id',
         'owner_user_id',
