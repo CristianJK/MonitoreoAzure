@@ -142,4 +142,46 @@ class WorkItemCommentAndStateTest extends TestCase
         Http::assertSent(fn (Request $request) => str_contains($request['query'] ?? '', "[System.AssignedTo] = 'ana@x.com'")
             && str_contains($request['query'], "[System.State] In ('In Progress')"));
     }
+
+    public function test_unlinks_pull_request_removing_every_matching_relation(): void
+    {
+        Http::fake([
+            '*/_apis/wit/workitems/10*' => Http::sequence()
+                ->push($this->workItemResponse(10)) // responsable (work-item.owner)
+                ->push([...$this->workItemResponse(10, [], [
+                    ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/PullRequestId/proj%2Frepo-1%2F700'],
+                    ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/PullRequestId/proj/repo-1/701'],
+                    ['rel' => 'Hyperlink', 'url' => 'https://empresa.sharepoint.com/doc'],
+                    ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/PullRequestId/proj/REPO-1/700'],
+                ]), 'rev' => 7])
+                ->push(['id' => 10]),
+        ]);
+
+        $this->deleteJson('/api/work-items/10/link-pr/repo-1/700')
+            ->assertOk()
+            ->assertJsonPath('data.removed', true);
+
+        Http::assertSent(fn (Request $request) => $request->method() === 'PATCH'
+            && json_decode($request->body(), true) === [
+                ['op' => 'test', 'path' => '/rev', 'value' => 7],
+                ['op' => 'remove', 'path' => '/relations/3'],
+                ['op' => 'remove', 'path' => '/relations/0'],
+            ]);
+        $this->assertDatabaseHas('audit_logs', ['azure_work_item_id' => '10', 'result' => 'ok']);
+    }
+
+    public function test_unlinking_a_pull_request_that_is_not_linked_does_nothing(): void
+    {
+        Http::fake([
+            '*/_apis/wit/workitems/10*' => Http::response([...$this->workItemResponse(10, [], [
+                ['rel' => 'ArtifactLink', 'url' => 'vstfs:///Git/PullRequestId/proj/repo-1/701'],
+            ]), 'rev' => 3]),
+        ]);
+
+        $this->deleteJson('/api/work-items/10/link-pr/repo-1/700')
+            ->assertOk()
+            ->assertJsonPath('data.removed', false);
+
+        Http::assertNotSent(fn (Request $request) => $request->method() === 'PATCH');
+    }
 }

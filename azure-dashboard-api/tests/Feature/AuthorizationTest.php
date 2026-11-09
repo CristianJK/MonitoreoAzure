@@ -48,6 +48,7 @@ class AuthorizationTest extends TestCase
             'estado' => ['PATCH', '/api/work-items/10/state', ['state' => 'Done', 'type' => 'Task']],
             'enlazar rama' => ['POST', '/api/work-items/10/link-branch', ['repository_id' => '4f1c9a2e-8b7d-4c3a-9e6f-1a2b3c4d5e6f', 'branch_name' => 'feature/x']],
             'enlazar PR' => ['POST', '/api/work-items/10/link-pr', ['artifact_id' => 'vstfs:///Git/PullRequestId/p/r/1']],
+            'desvincular PR' => ['DELETE', '/api/work-items/10/link-pr/repo/1', []],
             'alistamiento' => ['PUT', '/api/work-items/10/checklist/{definition}', ['value' => true]],
             'agente' => ['POST', '/api/work-items/10/agent/daily-comment', []],
             'cierre' => ['POST', '/api/work-items/10/agent/closure-comment', ['pull_requests' => [['repositoryId' => 'repo', 'pullRequestId' => 1]]]],

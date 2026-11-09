@@ -68,5 +68,13 @@ export const repositoryService = {
             artifact_id: artifactId
         });
         return response.data;
+    },
+
+    /** Quita el enlace del PR en el WI (el PR no se modifica en Azure) */
+    async unlinkPullRequest(workItemId: number, repositoryId: string, pullRequestId: number): Promise<{ removed: boolean }> {
+        const response = await apiClient.delete<{ data: { removed: boolean } }>(
+            `/work-items/${workItemId}/link-pr/${encodeURIComponent(repositoryId)}/${pullRequestId}`,
+        );
+        return response.data.data;
     }
 };

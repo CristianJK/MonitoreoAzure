@@ -763,6 +763,58 @@ class AzureDevOpsService
         }
     }
 
+    /**
+     * Quita el enlace de un Pull Request del Work Item. Si el PR está enlazado más de
+     * una vez (con "/" y con "%2F") se quitan todas las relaciones. Si no está enlazado,
+     * no hace nada.
+     */
+    public function unlinkPullRequestFromWorkItem(int $workItemId, string $repositoryId, int $pullRequestId): array
+    {
+        try {
+            $workItem = $this->client()->get("wit/workitems/{$workItemId}", ['$expand' => 'relations'])->json();
+            $indexes = self::pullRequestRelationIndexes($workItem['relations'] ?? [], $repositoryId, $pullRequestId);
+
+            if ($indexes === []) {
+                return ['removed' => false];
+            }
+
+            // Se quitan de mayor a menor para que los índices no se desplacen; "test" sobre
+            // la revisión evita borrar otra relación si el WI cambió entre medio
+            $operations = [['op' => 'test', 'path' => '/rev', 'value' => $workItem['rev'] ?? null]];
+            foreach (array_reverse($indexes) as $index) {
+                $operations[] = ['op' => 'remove', 'path' => "/relations/{$index}"];
+            }
+
+            $this->client()
+                ->withBody(json_encode($operations), 'application/json-patch+json')
+                ->patch("wit/workitems/{$workItemId}");
+
+            return ['removed' => true];
+        } catch (\Throwable $e) {
+            return $this->formatError($e, 'Fallo al quitar el Pull Request del Work Item');
+        }
+    }
+
+    /**
+     * Posiciones (en orden ascendente) de las relaciones que enlazan el PR indicado.
+     *
+     * @return int[]
+     */
+    protected static function pullRequestRelationIndexes(array $relations, string $repositoryId, int $pullRequestId): array
+    {
+        $indexes = [];
+
+        foreach (array_values($relations) as $index => $relation) {
+            $links = self::parseArtifactLinks([$relation])['pull_requests'];
+
+            if ($links && strcasecmp($links[0]['repositoryId'], $repositoryId) === 0 && $links[0]['pullRequestId'] === $pullRequestId) {
+                $indexes[] = $index;
+            }
+        }
+
+        return $indexes;
+    }
+
     protected function addArtifactLink($workItemId, string $url, string $name): array
     {
         return $this->client()

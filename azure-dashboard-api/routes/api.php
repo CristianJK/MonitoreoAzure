@@ -34,6 +34,8 @@ Route::middleware(['auth:sanctum', 'azure.pat'])->group(function () {
         Route::patch('/work-items/{id}/state', [AzureWorkItemController::class, 'updateState'])->whereNumber('id');
         Route::post('/work-items/{id}/link-branch', [AzureWorkItemController::class, 'linkBranch'])->whereNumber('id');
         Route::post('/work-items/{id}/link-pr', [AzureWorkItemController::class, 'linkPullRequest'])->whereNumber('id');
+        Route::delete('/work-items/{id}/link-pr/{repositoryId}/{pullRequestId}', [AzureWorkItemController::class, 'unlinkPullRequest'])
+            ->whereNumber(['id', 'pullRequestId'])->where('repositoryId', '[A-Za-z0-9._-]+');
         Route::put('/work-items/{id}/checklist/{definition}', [WorkItemChecklistController::class, 'update'])->whereNumber('id');
         Route::post('/work-items/{id}/checklist/sync-links', [WorkItemChecklistController::class, 'syncLinks'])->whereNumber('id');
         Route::post('/work-items/{id}/agent/daily-comment', [AgentCommentController::class, 'propose'])->whereNumber('id');

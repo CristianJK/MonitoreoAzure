@@ -175,6 +175,22 @@ class AzureWorkItemController extends Controller
         ]);
     }
 
+    public function unlinkPullRequest(int $id, string $repositoryId, int $pullRequestId): JsonResponse
+    {
+        $result = $this->azureDevOpsService->unlinkPullRequestFromWorkItem($id, $repositoryId, $pullRequestId);
+
+        if (isset($result['error'])) {
+            return $this->azureError($result);
+        }
+
+        return response()->json([
+            'message' => $result['removed']
+                ? 'Pull Request desvinculado del Work Item'
+                : 'El Pull Request no estaba enlazado a esta tarea.',
+            'data' => $result,
+        ]);
+    }
+
     /**
      * PRs que probablemente corresponden al work item y no están enlazados.
      */

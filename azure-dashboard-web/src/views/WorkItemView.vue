@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { workItemService, type LinkedPullRequest, type WorkItem, type WorkItemState } from '@/services/workItemService';
 import { agentService, type AgentApproval } from '@/services/agentService';
+import { repositoryService } from '@/services/repositoryService';
 import { errorMessage } from '@/services/apiClient';
 import type { ChecklistItem, WorkItemChecklist as Checklist } from '@/services/checklistService';
 import StateBadge from '@/components/StateBadge.vue';
@@ -67,6 +68,26 @@ const commentsCount = computed(() =>
 // ---------------------------------------------------------------------------
 // Pull Requests asociados
 // ---------------------------------------------------------------------------
+const pendingUnlink = ref<LinkedPullRequest | null>(null);
+const unlinking = ref(false);
+
+const unlinkPullRequest = async () => {
+    const pr = pendingUnlink.value;
+    if (!pr || !workItemData.value) return;
+    unlinking.value = true;
+    try {
+        await repositoryService.unlinkPullRequest(workItemData.value.id, pr.repositoryId, pr.id);
+        workItemData.value.pull_requests = (workItemData.value.pull_requests ?? [])
+            .filter(p => !(p.id === pr.id && p.repositoryId === pr.repositoryId));
+        toast.success(`PR !${pr.id} desvinculado`);
+        pendingUnlink.value = null;
+    } catch (e) {
+        toast.error(errorMessage(e, 'No se pudo desvincular el Pull Request'));
+    } finally {
+        unlinking.value = false;
+    }
+};
+
 const pullRequestStatus = (pr: LinkedPullRequest): { label: string; classes: string } => {
     if (pr.isDraft && pr.status === 'active') return { label: 'Borrador', classes: 'bg-surface-variant text-on-surface-variant' };
     switch (pr.status) {
@@ -486,7 +507,19 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                     <ul v-if="workItemData.pull_requests?.length" class="flex flex-col gap-2">
                         <li v-for="pr in workItemData.pull_requests" :key="`${pr.repositoryId}-${pr.id}`" class="p-2.5 bg-surface-container rounded-lg border border-outline-variant text-xs">
                             <template v-if="pr.error">
-                                <p class="font-semibold text-on-surface">PR !{{ pr.id }}</p>
+                                <div class="flex items-start justify-between gap-2">
+                                    <p class="font-semibold text-on-surface">PR !{{ pr.id }}</p>
+                                    <button
+                                    v-if="canEdit"
+                                    type="button"
+                                    class="btn-ghost p-0.5 rounded shrink-0 text-on-surface-variant hover:text-error"
+                                    :title="`Desvincular PR !${pr.id}`"
+                                    :aria-label="`Desvincular PR !${pr.id}`"
+                                    @click="pendingUnlink = pr"
+                                >
+                                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">link_off</span>
+                                </button>
+                                </div>
                                 <p class="text-error mt-0.5 break-words">No se pudo consultar en Azure DevOps</p>
                             </template>
                             <template v-else>
@@ -497,7 +530,19 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                                         rel="noopener noreferrer"
                                         class="text-body-sm text-primary hover:underline font-semibold min-w-0 break-words"
                                     >PR !{{ pr.id }} · {{ pr.title }}</a>
-                                    <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold" :class="pullRequestStatus(pr).classes">{{ pullRequestStatus(pr).label }}</span>
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" :class="pullRequestStatus(pr).classes">{{ pullRequestStatus(pr).label }}</span>
+                                        <button
+                                        v-if="canEdit"
+                                        type="button"
+                                        class="btn-ghost p-0.5 rounded shrink-0 text-on-surface-variant hover:text-error"
+                                        :title="`Desvincular PR !${pr.id}`"
+                                        :aria-label="`Desvincular PR !${pr.id}`"
+                                        @click="pendingUnlink = pr"
+                                    >
+                                        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">link_off</span>
+                                    </button>
+                                    </div>
                                 </div>
                                 <p class="mt-1.5 flex items-center gap-1 font-label-mono text-[11px] text-on-surface-variant min-w-0">
                                     <span class="truncate" :title="pr.sourceBranch">{{ pr.sourceBranch }}</span>
@@ -547,6 +592,23 @@ const onApprovalResolved = (resolved: AgentApproval) => {
                 </ul>
             </template>
             <p>El cambio se aplicará directamente en Azure DevOps.</p>
+        </ConfirmModal>
+
+        <!-- Confirmación para desvincular un PR -->
+        <ConfirmModal
+            :open="!!pendingUnlink"
+            :title="`Desvincular PR !${pendingUnlink?.id}`"
+            confirm-label="Desvincular"
+            danger
+            :loading="unlinking"
+            @confirm="unlinkPullRequest"
+            @cancel="pendingUnlink = null"
+        >
+            <p>
+                Se quitará el enlace entre este work item y
+                <span class="font-semibold">PR !{{ pendingUnlink?.id }}<template v-if="pendingUnlink?.title"> · {{ pendingUnlink.title }}</template></span>.
+            </p>
+            <p>El Pull Request no se modifica en Azure DevOps; puedes volver a vincularlo cuando quieras.</p>
         </ConfirmModal>
 
         <AgentCommentReviewModal
